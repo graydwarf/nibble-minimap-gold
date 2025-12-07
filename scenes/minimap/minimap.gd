@@ -472,7 +472,8 @@ func _create_player_marker() -> void:
 	# Custom draw for arrow
 	player_marker.set_script(preload("res://scenes/minimap/player_arrow.gd"))
 
-	viewport_container.add_child(player_marker)
+	# Add to self instead of viewport_container to avoid shader issues on web
+	add_child(player_marker)
 
 func _create_cardinal_indicator() -> void:
 	if not show_cardinal_directions:
@@ -484,7 +485,8 @@ func _create_cardinal_indicator() -> void:
 	cardinal_indicator.set_script(preload("res://scenes/minimap/cardinal_indicator.gd"))
 	cardinal_indicator.show_all_directions = show_all_cardinals
 
-	viewport_container.add_child(cardinal_indicator)
+	# Add to self (Minimap) instead of viewport_container to avoid shader issues on web
+	add_child(cardinal_indicator)
 
 func _create_edge_arrows() -> void:
 	edge_arrows = Control.new()
@@ -494,7 +496,8 @@ func _create_edge_arrows() -> void:
 	edge_arrows.minimap = self
 	edge_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	viewport_container.add_child(edge_arrows)
+	# Add to self (Minimap) instead of viewport_container to avoid shader issues on web
+	add_child(edge_arrows)
 
 func _create_distance_label() -> void:
 	# Load icon textures (optional - falls back to Unicode if not imported)
