@@ -10,6 +10,7 @@ enum CameraMode { FIRST_PERSON, THIRD_PERSON, ANGLED_25D, TOP_DOWN }
 @export var mouse_sensitivity: float = 0.002
 @export var sprint_multiplier: float = 1.8
 @export var camera_mode: CameraMode = CameraMode.FIRST_PERSON
+@export var map_boundary: float = 45.0  # Keep player within this distance from origin
 
 # Camera offset settings for different modes
 const CAMERA_SETTINGS := {
@@ -85,6 +86,11 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= 9.8 * delta
 
 	move_and_slide()
+
+	# Clamp position to map boundary
+	if map_boundary > 0:
+		global_position.x = clampf(global_position.x, -map_boundary, map_boundary)
+		global_position.z = clampf(global_position.z, -map_boundary, map_boundary)
 
 # Cycles through camera modes
 func cycle_camera_mode() -> void:
