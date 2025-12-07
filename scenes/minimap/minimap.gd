@@ -95,6 +95,10 @@ var _next_waypoint_id: int = 0
 var _active_waypoint_id: int = -1
 
 var _distance_label: Label = null
+var _elevation_icon: TextureRect = null
+var _distance_container: HBoxContainer = null
+var _arrow_up_texture: Texture2D = null
+var _arrow_down_texture: Texture2D = null
 
 @onready var viewport_container: SubViewportContainer = $SubViewportContainer
 @onready var sub_viewport: SubViewport = $SubViewportContainer/SubViewport
@@ -491,15 +495,27 @@ func _create_edge_arrows() -> void:
 	viewport_container.add_child(edge_arrows)
 
 func _create_distance_label() -> void:
+	# Load arrow textures (optional - falls back to Unicode if not imported)
+	if ResourceLoader.exists("res://assets/icons/arrow_up.svg"):
+		_arrow_up_texture = load("res://assets/icons/arrow_up.svg")
+	if ResourceLoader.exists("res://assets/icons/arrow_down.svg"):
+		_arrow_down_texture = load("res://assets/icons/arrow_down.svg")
+
+	# Create container for label + icon
+	_distance_container = HBoxContainer.new()
+	_distance_container.name = "DistanceContainer"
+	_distance_container.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	# Position below minimap
+	_distance_container.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_distance_container.offset_top = 4
+	_distance_container.offset_bottom = 24
+
+	# Create label
 	_distance_label = Label.new()
 	_distance_label.name = "DistanceLabel"
 	_distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_distance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	# Position below minimap
-	_distance_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_distance_label.offset_top = 4
-	_distance_label.offset_bottom = 24
 
 	# Styling
 	var label_settings := LabelSettings.new()
@@ -509,20 +525,30 @@ func _create_distance_label() -> void:
 	label_settings.shadow_size = 2
 	_distance_label.label_settings = label_settings
 
-	_distance_label.visible = false  # Hidden until waypoint added
-	add_child(_distance_label)
+	# Create elevation icon
+	_elevation_icon = TextureRect.new()
+	_elevation_icon.name = "ElevationIcon"
+	_elevation_icon.custom_minimum_size = Vector2(20, 20)
+	_elevation_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_elevation_icon.visible = false
+
+	_distance_container.add_child(_distance_label)
+	_distance_container.add_child(_elevation_icon)
+
+	_distance_container.visible = false  # Hidden until waypoint added
+	add_child(_distance_container)
 
 func _update_distance_label() -> void:
-	if not _distance_label:
+	if not _distance_label or not _distance_container:
 		return
 
 	var distance := get_active_waypoint_distance()
 	if distance < 0:
-		_distance_label.visible = false
+		_distance_container.visible = false
 		return
 
-	_distance_label.visible = true
-	var label := get_active_waypoint_label()
+	_distance_container.visible = true
+	var waypoint_label := get_active_waypoint_label()
 
 	# Format distance
 	var dist_text: String
@@ -531,10 +557,32 @@ func _update_distance_label() -> void:
 	else:
 		dist_text = "%dm" % int(distance)
 
-	if label.is_empty():
+	# Set label text
+	if waypoint_label.is_empty():
 		_distance_label.text = "◆ %s" % dist_text
 	else:
-		_distance_label.text = "◆ %s - %s" % [label, dist_text]
+		_distance_label.text = "◆ %s - %s" % [waypoint_label, dist_text]
+
+	# Determine elevation indicator (icon for above/below, hidden if same level)
+	var waypoint_pos: Vector3 = _waypoints[_active_waypoint_id].position
+	var height_diff: float = waypoint_pos.y - player.global_position.y
+
+	# Use icons if available, otherwise append Unicode arrows to label
+	if _arrow_up_texture and _arrow_down_texture and _elevation_icon:
+		if height_diff > 2.0:
+			_elevation_icon.texture = _arrow_up_texture
+			_elevation_icon.visible = true
+		elif height_diff < -2.0:
+			_elevation_icon.texture = _arrow_down_texture
+			_elevation_icon.visible = true
+		else:
+			_elevation_icon.visible = false
+	else:
+		# Fallback to Unicode arrows
+		if height_diff > 2.0:
+			_distance_label.text += " ↑"
+		elif height_diff < -2.0:
+			_distance_label.text += " ↓"
 
 func _update_player_marker() -> void:
 	if not player or not player_marker:
