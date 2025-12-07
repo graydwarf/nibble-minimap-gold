@@ -98,18 +98,18 @@ func _process(_delta: float) -> void:
 		_update_camera_position()
 		_update_player_marker()
 
-func _gui_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if not zoom_enabled:
 		return
 
-	if event is InputEventMouseButton:
-		if event.pressed:
-			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-				zoom_in()
-				accept_event()
-			elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				zoom_out()
-				accept_event()
+	# Handle scroll wheel zoom - always zooms minimap
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			zoom_in()
+			get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			zoom_out()
+			get_viewport().set_input_as_handled()
 
 # Zooms in (decreases ortho size, shows less area)
 func zoom_in() -> void:

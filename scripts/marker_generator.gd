@@ -3,8 +3,10 @@ extends Node3D
 ## Markers help players see their movement and orient themselves.
 
 @export var marker_count: int = 30
-@export var map_bounds: Vector2 = Vector2(100, 100)  # Half-size (full map is -100 to +100)
+@export var map_bounds: Vector2 = Vector2(45, 45)  # Half-size (stay within terrain chunk)
 @export var min_distance_from_center: float = 5.0
+
+var terrain_manager: TerrainManager
 
 # Color palette for markers (low-poly stylized look)
 const COLORS := [
@@ -17,7 +19,15 @@ const COLORS := [
 ]
 
 func _ready() -> void:
-	_generate_markers()
+	# Wait for terrain to be ready before placing markers
+	terrain_manager = get_parent().get_node_or_null("TerrainManager")
+	if terrain_manager:
+		if terrain_manager.is_ready():
+			_generate_markers()
+		else:
+			terrain_manager.terrain_ready.connect(_generate_markers)
+	else:
+		_generate_markers()
 
 func _generate_markers() -> void:
 	for i in range(marker_count):
@@ -36,6 +46,10 @@ func _generate_markers() -> void:
 			if pos.length() >= min_distance_from_center:
 				break
 			attempts += 1
+
+		# Place on terrain if available
+		if terrain_manager:
+			pos.y = terrain_manager.get_height_at(pos)
 
 		marker.position = pos
 		add_child(marker)

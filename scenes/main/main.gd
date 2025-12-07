@@ -3,11 +3,12 @@ extends Node3D
 @onready var player: CharacterBody3D = $Player
 @onready var minimap: Control = $CanvasLayer/Minimap
 @onready var hint_label: Label = $CanvasLayer/HintLabel
+@onready var terrain_manager: TerrainManager = $TerrainManager
 
 var config_dialog: Control = null
 var marker_positions: Dictionary = {}  # marker_id -> Vector3
 const PICKUP_DISTANCE := 3.0
-const SPAWN_RANGE := 80.0
+const SPAWN_RANGE := 40.0  # Stay within terrain chunk
 
 func _ready() -> void:
 	minimap.set_player(player)
@@ -54,13 +55,20 @@ func _on_camera_mode_changed(mode_name: String) -> void:
 
 func _spawn_demo_markers() -> void:
 	# Spawn various marker types to demo the POI system
-	_add_tracked_marker(Vector3(20, 0, -15), "objective", "Quest")
-	_add_tracked_marker(Vector3(-25, 0, 10), "enemy", "Goblin")
-	_add_tracked_marker(Vector3(40, 0, 30), "loot", "Chest")
-	_add_tracked_marker(Vector3(-35, 0, -40), "friendly", "NPC")
-	_add_tracked_marker(Vector3(50, 0, -20), "waypoint")
-	_add_tracked_marker(Vector3(-15, 0, 45), "enemy")
-	_add_tracked_marker(Vector3(60, 0, 60), "loot", "Rare")
+	_add_tracked_marker(_get_terrain_pos(20, -15), "objective", "Quest")
+	_add_tracked_marker(_get_terrain_pos(-25, 10), "enemy", "Goblin")
+	_add_tracked_marker(_get_terrain_pos(35, 25), "loot", "Chest")
+	_add_tracked_marker(_get_terrain_pos(-30, -35), "friendly", "NPC")
+	_add_tracked_marker(_get_terrain_pos(40, -20), "waypoint")
+	_add_tracked_marker(_get_terrain_pos(-15, 40), "enemy")
+	_add_tracked_marker(_get_terrain_pos(30, 35), "loot", "Rare")
+
+# Returns position with terrain height
+func _get_terrain_pos(x: float, z: float) -> Vector3:
+	var pos := Vector3(x, 0, z)
+	if terrain_manager:
+		pos.y = terrain_manager.get_height_at(pos)
+	return pos
 
 func _add_tracked_marker(pos: Vector3, marker_type: String, label: String = "") -> int:
 	var marker_id: int = minimap.add_marker(pos, marker_type, label)
@@ -85,10 +93,9 @@ func _respawn_marker(old_id: int) -> void:
 	minimap.remove_marker(old_id)
 	marker_positions.erase(old_id)
 
-	# Spawn at new random location
-	var new_pos := Vector3(
+	# Spawn at new random location with terrain height
+	var new_pos := _get_terrain_pos(
 		randf_range(-SPAWN_RANGE, SPAWN_RANGE),
-		0,
 		randf_range(-SPAWN_RANGE, SPAWN_RANGE)
 	)
 	_add_tracked_marker(new_pos, data.type, data.label)
