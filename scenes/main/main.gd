@@ -94,7 +94,7 @@ func _spawn_single_collectible(color: Color) -> void:
 	collectible.global_position = spawn_pos
 
 	# Add tracked marker for this collectible
-	var marker_id := minimap.add_tracked_marker(collectible, "loot")
+	var marker_id: int = minimap.add_tracked_marker(collectible, "loot")
 	collectibles[collectible] = marker_id
 
 	# Connect collection signal
@@ -151,4 +151,3 @@ func _spawn_wanderers() -> void:
 
 		# Add tracked marker that follows this wanderer
 		minimap.add_tracked_marker(wanderer, "enemy")
-
