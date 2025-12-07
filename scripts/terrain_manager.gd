@@ -68,12 +68,14 @@ func generate_initial_terrain() -> void:
 	_is_ready = true
 	terrain_ready.emit()
 
+const TerrainChunkScript = preload("res://scripts/terrain_chunk.gd")
+
 # Loads a chunk at the given coordinate if not already loaded
-func _load_chunk(coord: Vector2i) -> TerrainChunk:
+func _load_chunk(coord: Vector2i) -> Node3D:
 	if _chunks.has(coord):
 		return _chunks[coord]
 
-	var chunk := TerrainChunk.new()
+	var chunk := TerrainChunkScript.new()
 	chunk.generate(coord, noise, chunk_size, resolution, height_scale)
 	chunk.name = "Chunk_%d_%d" % [coord.x, coord.y]
 	add_child(chunk)
@@ -117,7 +119,7 @@ func update_chunks(player_pos: Vector3) -> void:
 func get_height_at(world_pos: Vector3) -> float:
 	if not noise:
 		return 0.0
-	return TerrainChunk.get_height_at(noise, world_pos, height_scale)
+	return TerrainChunkScript.get_height_at(noise, world_pos, height_scale)
 
 # Returns whether terrain is ready
 func is_ready() -> bool:

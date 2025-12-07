@@ -6,7 +6,7 @@ extends Node3D
 @export var map_bounds: Vector2 = Vector2(45, 45)  # Half-size (stay within terrain chunk)
 @export var min_distance_from_center: float = 5.0
 
-var terrain_manager: TerrainManager
+var terrain_manager: Node3D  # TerrainManager
 
 # Color palette for markers (low-poly stylized look)
 const COLORS := [

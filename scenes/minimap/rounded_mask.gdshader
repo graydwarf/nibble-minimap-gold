@@ -3,6 +3,7 @@ shader_type canvas_item;
 uniform float corner_radius : hint_range(0.0, 50.0) = 8.0;
 uniform vec4 border_color : source_color = vec4(1.0, 1.0, 1.0, 0.9);
 uniform float border_width : hint_range(0.0, 10.0) = 2.0;
+uniform float opacity : hint_range(0.0, 1.0) = 1.0;
 
 // Signed distance function for rounded rectangle
 float rounded_rect_sdf(vec2 p, vec2 size, float radius) {
@@ -32,6 +33,9 @@ void fragment() {
     // Add border
     final_color = mix(final_color, border_color, border_alpha * border_color.a);
     final_color.a = max(final_color.a, border_alpha * border_color.a);
+
+    // Apply opacity
+    final_color.a *= opacity;
 
     COLOR = final_color;
 }
