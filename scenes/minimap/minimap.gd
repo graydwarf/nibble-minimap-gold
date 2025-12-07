@@ -63,6 +63,9 @@ enum MapView { TOP_DOWN, ANGLED_25D, PERSPECTIVE_3D }
 @export_group("Theme")
 @export var minimap_theme: Resource = null  # MinimapTheme resource
 
+@export_group("Edge Arrows")
+@export_range(0.0, 0.8) var edge_arrow_inset: float = 0.0  # 0.0 = edges, 0.5 = halfway to center
+
 @export_group("Compass Bar")
 @export var compass_bar_enabled: bool = false
 @export var compass_bar_width: float = 400.0
@@ -511,6 +514,12 @@ func _create_edge_arrows() -> void:
 	edge_arrows.set_script(preload("res://scenes/minimap/edge_arrows.gd"))
 	edge_arrows.minimap = self
 	edge_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# On web, use 0.5 inset for testing (brings arrows halfway to center)
+	if _is_web and edge_arrow_inset == 0.0:
+		edge_arrows.edge_inset = 0.5
+	else:
+		edge_arrows.edge_inset = edge_arrow_inset
 
 	# Set explicit size (web compatibility - anchors may not work)
 	edge_arrows.position = Vector2.ZERO

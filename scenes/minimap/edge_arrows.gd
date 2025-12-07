@@ -6,6 +6,7 @@ var minimap: Control = null
 var arrow_color: Color = Color(1.0, 1.0, 0.0)  # Yellow
 var waypoint_color: Color = Color(0.8, 0.5, 1.0)  # Purple
 var edge_padding: float = 12.0  # Distance from edge
+var edge_inset: float = 0.0  # 0.0 = edges, 0.5 = halfway to center (for web testing)
 
 # Pool of arrow TextureRects for reuse
 var _arrow_pool: Array[TextureRect] = []
@@ -120,7 +121,9 @@ func _show_edge_arrow(center: Vector2, target: Vector2) -> void:
 	arrow.visible = true
 
 func _get_edge_intersection(center: Vector2, direction: Vector2) -> Vector2:
-	var half_size := size / 2.0 - Vector2(edge_padding, edge_padding)
+	# Apply edge_inset: 0.0 = full size (edges), 0.5 = halfway to center
+	var inset_factor := 1.0 - edge_inset
+	var half_size := (size / 2.0 - Vector2(edge_padding, edge_padding)) * inset_factor
 	var t_values: Array[float] = []
 
 	if direction.x != 0:

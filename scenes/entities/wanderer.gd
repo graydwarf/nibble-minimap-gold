@@ -9,8 +9,10 @@ extends CharacterBody3D
 @export var move_speed: float = 3.0
 @export var wander_radius: float = 35.0
 @export var waypoint_threshold: float = 2.0
+@export var waypoint_timeout: float = 15.0  # Pick new waypoint if not reached in this time
 
 var _current_waypoint: Vector3 = Vector3.ZERO
+var _waypoint_timer: float = 0.0  # Time spent moving to current waypoint
 var _terrain_manager: Node3D  # TerrainManager
 var _mesh: MeshInstance3D
 
@@ -51,6 +53,12 @@ func _physics_process(delta: float) -> void:
 	if _current_waypoint == Vector3.ZERO:
 		return
 
+	# Track time spent moving to this waypoint
+	_waypoint_timer += delta
+	if _waypoint_timer >= waypoint_timeout:
+		_pick_new_waypoint()
+		return
+
 	var to_waypoint := _current_waypoint - global_position
 	to_waypoint.y = 0
 	var distance := to_waypoint.length()
@@ -76,6 +84,7 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, target_angle, 5.0 * delta)
 
 func _pick_new_waypoint() -> void:
+	_waypoint_timer = 0.0  # Reset timer when picking new waypoint
 	var angle := randf() * TAU
 	var distance := randf_range(10.0, wander_radius)
 	var waypoint_x := cos(angle) * distance
