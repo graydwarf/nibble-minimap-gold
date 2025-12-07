@@ -1,32 +1,55 @@
 extends Control
-## Draws cardinal direction indicators (N/S/E/W) on the minimap border.
+## Cardinal direction indicators (N/S/E/W) using Label nodes for web compatibility.
 
 @export var show_all_directions: bool = true  # Show N/S/E/W or just N
 @export var font_size: int = 14
 @export var text_color: Color = Color(1, 1, 1, 0.8)
 @export var north_color: Color = Color(1, 0.3, 0.3, 1)  # Red for North
 
+var _labels: Dictionary = {}  # "N", "E", "S", "W" -> Label
+
+func _ready() -> void:
+	_create_labels()
+	_update_positions()
+
 func _process(_delta: float) -> void:
-	queue_redraw()
+	_update_positions()
 
-func _draw() -> void:
+func _create_labels() -> void:
+	for letter in ["N", "E", "S", "W"]:
+		var label := Label.new()
+		label.text = letter
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+		var settings := LabelSettings.new()
+		settings.font_size = font_size
+		settings.font_color = text_color
+		settings.shadow_color = Color(0, 0, 0, 0.5)
+		settings.shadow_size = 1
+		settings.shadow_offset = Vector2(1, 1)
+		label.label_settings = settings
+
+		add_child(label)
+		_labels[letter] = label
+
+func _update_positions() -> void:
 	var center := size / 2
-	var radius := minf(size.x, size.y) / 2 - 16  # Inset from edge
+	var radius := minf(size.x, size.y) / 2 - 16
 
-	# Draw North (always) - same color as others for consistency
-	_draw_cardinal("N", center + Vector2(0, -radius + 18), text_color)
+	# Position labels
+	if "N" in _labels:
+		_labels["N"].position = center + Vector2(-8, -radius + 8)
+		_labels["N"].visible = true
 
-	if show_all_directions:
-		_draw_cardinal("E", center + Vector2(radius - 4, 14), text_color)
-		_draw_cardinal("S", center + Vector2(0, radius + 10), text_color)
-		_draw_cardinal("W", center + Vector2(-radius + 4, 14), text_color)
+	if "E" in _labels:
+		_labels["E"].position = center + Vector2(radius - 12, 0)
+		_labels["E"].visible = show_all_directions
 
-func _draw_cardinal(letter: String, pos: Vector2, color: Color) -> void:
-	var font := ThemeDB.fallback_font
-	var text_size := font.get_string_size(letter, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
-	var draw_pos := pos - text_size / 2
+	if "S" in _labels:
+		_labels["S"].position = center + Vector2(-6, radius - 4)
+		_labels["S"].visible = show_all_directions
 
-	# Draw shadow for readability
-	draw_string(font, draw_pos + Vector2(1, 1), letter, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color(0, 0, 0, 0.5))
-	# Draw letter
-	draw_string(font, draw_pos, letter, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, color)
+	if "W" in _labels:
+		_labels["W"].position = center + Vector2(-radius - 2, 0)
+		_labels["W"].visible = show_all_directions

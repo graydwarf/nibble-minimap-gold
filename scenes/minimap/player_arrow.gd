@@ -1,10 +1,21 @@
 extends Control
-## Draws a clean vector arrow for the player marker on the minimap.
+## Player arrow marker on the minimap using Polygon2D for web compatibility.
+
+var _arrow_polygon: Polygon2D = null
+
+func _ready() -> void:
+	_arrow_polygon = Polygon2D.new()
+	_arrow_polygon.color = Color(1, 1, 1, 0.95)
+	add_child(_arrow_polygon)
+	_update_arrow()
 
 func _process(_delta: float) -> void:
-	queue_redraw()
+	_update_arrow()
 
-func _draw() -> void:
+func _update_arrow() -> void:
+	if not _arrow_polygon:
+		return
+
 	var center := size / 2
 	var arrow_size: float = minf(size.x, size.y) * 0.32
 
@@ -16,8 +27,4 @@ func _draw() -> void:
 		center + Vector2(arrow_size * 0.6, arrow_size * 0.5),   # Bottom right
 	])
 
-	# White fill with slight transparency
-	draw_colored_polygon(points, Color(1, 1, 1, 0.95))
-
-	# White outline for clarity
-	draw_polyline(points + PackedVector2Array([points[0]]), Color(1, 1, 1, 1), 1.5, true)
+	_arrow_polygon.polygon = points
