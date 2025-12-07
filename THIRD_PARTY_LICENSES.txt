@@ -8,7 +8,8 @@ License: MIT
 Source: https://github.com/microsoft/fluentui-system-icons
 
 Icons used:
-- (Custom solid triangles - assets/icons/arrow_up.svg, arrow_down.svg)
+- Custom solid triangles (assets/icons/arrow_up.svg, arrow_down.svg)
+- Custom diamond (assets/icons/diamond.svg)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

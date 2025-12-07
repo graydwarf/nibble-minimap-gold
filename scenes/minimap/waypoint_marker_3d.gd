@@ -89,8 +89,8 @@ func _create_diamond_mesh() -> ArrayMesh:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 
-	var size := 0.8  # Diamond width/depth
-	var height := 1.2  # Total height
+	var size := 2.0  # Diamond width/depth
+	var height := 3.0  # Total height
 
 	# Diamond vertices: top, middle 4 corners, bottom
 	var top := Vector3(0, height / 2, 0)

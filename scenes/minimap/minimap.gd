@@ -96,9 +96,11 @@ var _active_waypoint_id: int = -1
 
 var _distance_label: Label = null
 var _elevation_icon: TextureRect = null
+var _waypoint_icon: TextureRect = null
 var _distance_container: HBoxContainer = null
 var _arrow_up_texture: Texture2D = null
 var _arrow_down_texture: Texture2D = null
+var _diamond_texture: Texture2D = null
 
 @onready var viewport_container: SubViewportContainer = $SubViewportContainer
 @onready var sub_viewport: SubViewport = $SubViewportContainer/SubViewport
@@ -495,13 +497,15 @@ func _create_edge_arrows() -> void:
 	viewport_container.add_child(edge_arrows)
 
 func _create_distance_label() -> void:
-	# Load arrow textures (optional - falls back to Unicode if not imported)
+	# Load icon textures (optional - falls back to Unicode if not imported)
 	if ResourceLoader.exists("res://assets/icons/arrow_up.svg"):
 		_arrow_up_texture = load("res://assets/icons/arrow_up.svg")
 	if ResourceLoader.exists("res://assets/icons/arrow_down.svg"):
 		_arrow_down_texture = load("res://assets/icons/arrow_down.svg")
+	if ResourceLoader.exists("res://assets/icons/diamond.svg"):
+		_diamond_texture = load("res://assets/icons/diamond.svg")
 
-	# Create container for label + icon
+	# Create container for icons + label
 	_distance_container = HBoxContainer.new()
 	_distance_container.name = "DistanceContainer"
 	_distance_container.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -510,6 +514,14 @@ func _create_distance_label() -> void:
 	_distance_container.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_distance_container.offset_top = 4
 	_distance_container.offset_bottom = 24
+
+	# Create waypoint diamond icon (before label)
+	_waypoint_icon = TextureRect.new()
+	_waypoint_icon.name = "WaypointIcon"
+	_waypoint_icon.custom_minimum_size = Vector2(16, 16)
+	_waypoint_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if _diamond_texture:
+		_waypoint_icon.texture = _diamond_texture
 
 	# Create label
 	_distance_label = Label.new()
@@ -525,13 +537,14 @@ func _create_distance_label() -> void:
 	label_settings.shadow_size = 2
 	_distance_label.label_settings = label_settings
 
-	# Create elevation icon
+	# Create elevation icon (after label)
 	_elevation_icon = TextureRect.new()
 	_elevation_icon.name = "ElevationIcon"
 	_elevation_icon.custom_minimum_size = Vector2(20, 20)
 	_elevation_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_elevation_icon.visible = false
 
+	_distance_container.add_child(_waypoint_icon)
 	_distance_container.add_child(_distance_label)
 	_distance_container.add_child(_elevation_icon)
 
