@@ -1,33 +1,42 @@
 extends Control
 ## Shows arrows at minimap edges pointing to off-screen POI markers and waypoints.
-## Uses Polygon2D nodes for web compatibility (instead of _draw()).
+## Uses Sprite2D nodes with textures for web compatibility.
 
 var minimap: Control = null
 var arrow_color: Color = Color(1.0, 1.0, 0.0)  # Yellow
 var waypoint_color: Color = Color(0.8, 0.5, 1.0)  # Purple
-var arrow_size: float = 7.5  # Arrow size
-var waypoint_size: float = 10.0  # Diamond size (larger than arrows)
 var edge_padding: float = 12.0  # Distance from edge
 
-# Pool of arrow polygons for reuse
-var _arrow_pool: Array[Polygon2D] = []
+# Pool of arrow sprites for reuse
+var _arrow_pool: Array[Sprite2D] = []
 var _arrow_pool_index: int = 0
-var _waypoint_diamond: Polygon2D = null
+var _waypoint_sprite: Sprite2D = null
+
+var _arrow_texture: Texture2D = null
+var _diamond_texture: Texture2D = null
 
 const MAX_ARROWS := 20  # Max simultaneous edge arrows
 
 func _ready() -> void:
-	# Pre-create arrow pool
+	# Load textures
+	if ResourceLoader.exists("res://assets/icons/edge_arrow.svg"):
+		_arrow_texture = load("res://assets/icons/edge_arrow.svg")
+	if ResourceLoader.exists("res://assets/icons/edge_diamond.svg"):
+		_diamond_texture = load("res://assets/icons/edge_diamond.svg")
+
+	# Pre-create arrow pool using Sprite2D
 	for i in MAX_ARROWS:
-		var arrow := Polygon2D.new()
+		var arrow := Sprite2D.new()
+		arrow.texture = _arrow_texture
 		arrow.visible = false
 		add_child(arrow)
 		_arrow_pool.append(arrow)
 
-	# Create waypoint diamond
-	_waypoint_diamond = Polygon2D.new()
-	_waypoint_diamond.visible = false
-	add_child(_waypoint_diamond)
+	# Create waypoint diamond sprite
+	_waypoint_sprite = Sprite2D.new()
+	_waypoint_sprite.texture = _diamond_texture
+	_waypoint_sprite.visible = false
+	add_child(_waypoint_sprite)
 
 func _process(_delta: float) -> void:
 	_update_arrows()
@@ -84,17 +93,9 @@ func _show_edge_arrow(center: Vector2, target: Vector2) -> void:
 	var edge_pos := _get_edge_intersection(center, direction)
 	var angle := direction.angle()
 
-	# Triangle arrow pointing toward POI
-	var points := PackedVector2Array([
-		Vector2(0, 0),  # Tip
-		Vector2(-arrow_size * 1.2, -arrow_size * 0.5),  # Back left
-		Vector2(-arrow_size * 1.2, arrow_size * 0.5),  # Back right
-	])
-
-	arrow.polygon = points
-	arrow.color = arrow_color
 	arrow.position = edge_pos
 	arrow.rotation = angle
+	arrow.modulate = arrow_color
 	arrow.visible = true
 
 func _get_edge_intersection(center: Vector2, direction: Vector2) -> Vector2:
@@ -135,7 +136,7 @@ func _get_edge_intersection(center: Vector2, direction: Vector2) -> Vector2:
 
 func _update_waypoint_indicator(map_center: Vector2, player_pos: Vector3, scale_factor: float) -> void:
 	if minimap._active_waypoint_id == -1 or minimap._active_waypoint_id not in minimap._waypoints:
-		_waypoint_diamond.visible = false
+		_waypoint_sprite.visible = false
 		return
 
 	var waypoint_data: Dictionary = minimap._waypoints[minimap._active_waypoint_id]
@@ -154,27 +155,18 @@ func _update_waypoint_indicator(map_center: Vector2, player_pos: Vector3, scale_
 	)
 
 	if waypoint_visible:
-		_waypoint_diamond.visible = false
+		_waypoint_sprite.visible = false
 		return
 
 	var direction := (waypoint_screen_pos - map_center).normalized()
 	var edge_pos := _get_edge_intersection(map_center, direction)
 
-	# Diamond shape centered at origin
-	var half := waypoint_size * 0.5
-	var diamond_points := PackedVector2Array([
-		Vector2(0, -half),   # Top
-		Vector2(half, 0),    # Right
-		Vector2(0, half),    # Bottom
-		Vector2(-half, 0),   # Left
-	])
-
-	_waypoint_diamond.polygon = diamond_points
-	_waypoint_diamond.color = wp_color
-	_waypoint_diamond.position = edge_pos
-	_waypoint_diamond.visible = true
+	_waypoint_sprite.position = edge_pos
+	_waypoint_sprite.modulate = wp_color
+	_waypoint_sprite.visible = true
 
 func _hide_all() -> void:
 	for arrow in _arrow_pool:
 		arrow.visible = false
-	_waypoint_diamond.visible = false
+	if _waypoint_sprite:
+		_waypoint_sprite.visible = false
