@@ -7,7 +7,9 @@
       "Bash(gh repo create:*)",
       "Bash(git push:*)",
       "Bash(git rm:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(\"C:\\dad\\apps\\godot\\godot-4.5-stable\\Godot_v4.5-stable_win64.exe\" --path \"C:\\dad\\projects\\godot\\godot-4\\nibbles\\mini-map\\nibble-minimap-gold\")",
+      "Bash(\"C:\\dad\\apps\\godot\\godot-4.5-stable\\Godot_v4.5-stable_win64.exe\" --path \"C:\\dad\\projects\\godot\\godot-4\\nibbles\\mini-map\\nibble-minimap-gold\" --headless --quit)"
     ],
     "deny": [],
     "ask": []

@@ -85,10 +85,10 @@ func _rebuild_mesh(current_time: float) -> void:
 		var point: Dictionary = _trail_points[i]
 		var pos: Vector3 = point.position
 
-		# Calculate alpha based on age
+		# Calculate alpha based on age (fade 2x faster than duration)
 		var point_time: float = point.time
 		var age: float = current_time - point_time
-		var alpha: float = 1.0 - (age / trail_duration)
+		var alpha: float = 1.0 - (age / trail_duration) * 2.0
 		alpha = clampf(alpha, 0.0, 1.0)
 
 		# Also fade based on position in trail (oldest = more faded)
