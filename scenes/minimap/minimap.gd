@@ -463,17 +463,20 @@ func _create_player_marker() -> void:
 	# Create 2D arrow overlay centered on minimap
 	player_marker = Control.new()
 	player_marker.name = "PlayerArrow"
-	player_marker.set_anchors_preset(Control.PRESET_CENTER)
 	player_marker.pivot_offset = Vector2(12, 12)  # Center of 24x24 arrow
 	player_marker.custom_minimum_size = Vector2(24, 24)
 	player_marker.size = Vector2(24, 24)
-	player_marker.position = Vector2(-12, -12)  # Center it
+	player_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Position at center of minimap (explicit positioning for web compatibility)
+	player_marker.position = Vector2(map_size) / 2.0 - Vector2(12, 12)
 
 	# Custom draw for arrow
 	player_marker.set_script(preload("res://scenes/minimap/player_arrow.gd"))
 
 	# Add to self instead of viewport_container to avoid shader issues on web
 	add_child(player_marker)
+	player_marker.move_to_front()
 
 func _create_cardinal_indicator() -> void:
 	if not show_cardinal_directions:
@@ -481,23 +484,32 @@ func _create_cardinal_indicator() -> void:
 
 	cardinal_indicator = Control.new()
 	cardinal_indicator.name = "CardinalIndicator"
-	cardinal_indicator.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cardinal_indicator.set_script(preload("res://scenes/minimap/cardinal_indicator.gd"))
 	cardinal_indicator.show_all_directions = show_all_cardinals
+	cardinal_indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Set explicit size (web compatibility - anchors may not work)
+	cardinal_indicator.position = Vector2.ZERO
+	cardinal_indicator.size = Vector2(map_size)
 
 	# Add to self (Minimap) instead of viewport_container to avoid shader issues on web
 	add_child(cardinal_indicator)
+	cardinal_indicator.move_to_front()
 
 func _create_edge_arrows() -> void:
 	edge_arrows = Control.new()
 	edge_arrows.name = "EdgeArrows"
-	edge_arrows.set_anchors_preset(Control.PRESET_FULL_RECT)
 	edge_arrows.set_script(preload("res://scenes/minimap/edge_arrows.gd"))
 	edge_arrows.minimap = self
 	edge_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	# Set explicit size (web compatibility - anchors may not work)
+	edge_arrows.position = Vector2.ZERO
+	edge_arrows.size = Vector2(map_size)
+
 	# Add to self (Minimap) instead of viewport_container to avoid shader issues on web
 	add_child(edge_arrows)
+	edge_arrows.move_to_front()
 
 func _create_distance_label() -> void:
 	# Load icon textures (optional - falls back to Unicode if not imported)
@@ -657,6 +669,14 @@ func _update_size() -> void:
 	if shadow:
 		shadow.custom_minimum_size = Vector2(map_size)
 		shadow.size = Vector2(map_size)
+
+	# Update overlay sizes (web compatibility - explicit sizing)
+	if edge_arrows:
+		edge_arrows.size = Vector2(map_size)
+	if cardinal_indicator:
+		cardinal_indicator.size = Vector2(map_size)
+	if player_marker:
+		player_marker.position = Vector2(map_size) / 2.0 - Vector2(12, 12)
 
 	_update_position()
 

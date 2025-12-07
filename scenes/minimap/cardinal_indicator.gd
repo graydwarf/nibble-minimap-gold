@@ -6,6 +6,9 @@ extends Control
 @export var text_color: Color = Color(1, 1, 1, 0.8)
 @export var north_color: Color = Color(1, 0.3, 0.3, 1)  # Red for North
 
+func _process(_delta: float) -> void:
+	queue_redraw()
+
 func _draw() -> void:
 	var center := size / 2
 	var radius := minf(size.x, size.y) / 2 - 16  # Inset from edge

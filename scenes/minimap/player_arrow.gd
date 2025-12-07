@@ -1,6 +1,9 @@
 extends Control
 ## Draws a clean vector arrow for the player marker on the minimap.
 
+func _process(_delta: float) -> void:
+	queue_redraw()
+
 func _draw() -> void:
 	var center := size / 2
 	var arrow_size: float = minf(size.x, size.y) * 0.32
