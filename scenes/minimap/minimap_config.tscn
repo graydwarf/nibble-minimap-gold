@@ -1,0 +1,148 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/minimap/minimap_config.gd" id="1_script"]
+
+[node name="MinimapConfig" type="PanelContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -180.0
+offset_right = 150.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Minimap Settings"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="SizeRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="SizeLabel" type="Label" parent="MarginContainer/VBoxContainer/SizeRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Size"
+
+[node name="SizeSlider" type="HSlider" parent="MarginContainer/VBoxContainer/SizeRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 100.0
+max_value = 300.0
+step = 10.0
+value = 200.0
+
+[node name="SizeValue" type="Label" parent="MarginContainer/VBoxContainer/SizeRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "200"
+horizontal_alignment = 2
+
+[node name="CornerRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="CornerLabel" type="Label" parent="MarginContainer/VBoxContainer/CornerRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Corner"
+
+[node name="CornerOption" type="OptionButton" parent="MarginContainer/VBoxContainer/CornerRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ZoomRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ZoomLabel" type="Label" parent="MarginContainer/VBoxContainer/ZoomRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Zoom"
+
+[node name="ZoomSlider" type="HSlider" parent="MarginContainer/VBoxContainer/ZoomRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 15.0
+max_value = 60.0
+step = 5.0
+value = 30.0
+
+[node name="ZoomValue" type="Label" parent="MarginContainer/VBoxContainer/ZoomRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "30"
+horizontal_alignment = 2
+
+[node name="ViewRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ViewLabel" type="Label" parent="MarginContainer/VBoxContainer/ViewRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "View"
+
+[node name="ViewOption" type="OptionButton" parent="MarginContainer/VBoxContainer/ViewRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="OpacityRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="OpacityLabel" type="Label" parent="MarginContainer/VBoxContainer/OpacityRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Opacity"
+
+[node name="OpacitySlider" type="HSlider" parent="MarginContainer/VBoxContainer/OpacityRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.05
+value = 0.85
+
+[node name="OpacityValue" type="Label" parent="MarginContainer/VBoxContainer/OpacityRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "85%"
+horizontal_alignment = 2
+
+[node name="CardinalsRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="CardinalsLabel" type="Label" parent="MarginContainer/VBoxContainer/CardinalsRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Cardinals"
+
+[node name="CardinalsCheck" type="CheckBox" parent="MarginContainer/VBoxContainer/CardinalsRow"]
+layout_mode = 2
+button_pressed = true
+text = "Show N/S/E/W"
+
+[node name="HSeparator2" type="HSeparator" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Close (M)"

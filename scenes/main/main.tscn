@@ -1,0 +1,117 @@
+[gd_scene load_steps=13 format=3 uid="uid://cxm5k8qj2n7wa"]
+
+[ext_resource type="Script" uid="uid://rnoeducqawq8" path="res://scenes/main/main.gd" id="1_main"]
+[ext_resource type="PackedScene" uid="uid://dv8k2m3xp7qna" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="Script" uid="uid://buy321gfdxi87" path="res://scripts/marker_generator.gd" id="3_markers"]
+[ext_resource type="PackedScene" uid="uid://bwm7k4qp2n8xa" path="res://scenes/minimap/minimap.tscn" id="4_minimap"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
+sky_top_color = Color(0.15, 0.3, 0.55, 1)
+sky_horizon_color = Color(0.55, 0.6, 0.7, 1)
+ground_bottom_color = Color(0.12, 0.1, 0.08, 1)
+ground_horizon_color = Color(0.35, 0.32, 0.28, 1)
+sun_angle_max = 25.0
+sun_curve = 0.1
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ProceduralSkyMaterial_1")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_source = 2
+ambient_light_color = Color(0.45, 0.5, 0.6, 1)
+ambient_light_energy = 0.5
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.3
+glow_bloom = 0.1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_color = Color(0.22, 0.28, 0.18, 1)
+roughness = 0.95
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_1"]
+material = SubResource("StandardMaterial3D_ground")
+size = Vector2(200, 200)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(200, 0.1, 200)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall"]
+size = Vector3(200, 10, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_hint"]
+font_size = 14
+font_color = Color(1, 1, 1, 0.6)
+shadow_color = Color(0, 0, 0, 0.5)
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.86601907, -0.3535631, 0.3535593, 0, 0.70710295, 0.7071106, -0.500011, -0.61237127, 0.61236465, 0, 20, 0)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("PlaneMesh_1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_ground")
+
+[node name="Boundaries" type="Node3D" parent="."]
+
+[node name="NorthWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, -100)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/NorthWall"]
+shape = SubResource("BoxShape3D_wall")
+
+[node name="SouthWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 100)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/SouthWall"]
+shape = SubResource("BoxShape3D_wall")
+
+[node name="EastWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 100, 5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/EastWall"]
+shape = SubResource("BoxShape3D_wall")
+
+[node name="WestWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -100, 5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/WestWall"]
+shape = SubResource("BoxShape3D_wall")
+
+[node name="MarkerGenerator" type="Node3D" parent="."]
+script = ExtResource("3_markers")
+marker_count = 180
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Minimap" parent="CanvasLayer" instance=ExtResource("4_minimap")]
+unique_name_in_owner = true
+layout_mode = 3
+
+[node name="HintLabel" type="Label" parent="CanvasLayer"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -40.0
+offset_right = 300.0
+offset_bottom = -16.0
+text = "WASD: Move | Shift: Sprint | ESC: Release mouse | Click: Capture"
+label_settings = SubResource("LabelSettings_hint")

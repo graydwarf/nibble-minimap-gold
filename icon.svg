@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect x="8" y="8" width="112" height="112" rx="12" fill="#1a1a2e"/>
+
+  <!-- Minimap border -->
+  <rect x="8" y="8" width="112" height="112" rx="12" fill="none" stroke="#5a7a9a" stroke-width="3"/>
+
+  <!-- Terrain dots (scattered debris/landmarks) -->
+  <circle cx="30" cy="35" r="4" fill="#4a6a4a"/>
+  <circle cx="85" cy="28" r="5" fill="#5a5a7a"/>
+  <circle cx="100" cy="55" r="4" fill="#4a6a4a"/>
+  <circle cx="25" cy="75" r="5" fill="#5a5a7a"/>
+  <circle cx="45" cy="95" r="4" fill="#4a6a4a"/>
+  <circle cx="90" cy="85" r="6" fill="#5a5a7a"/>
+  <circle cx="70" cy="40" r="3" fill="#4a6a4a"/>
+  <circle cx="38" cy="55" r="4" fill="#5a5a7a"/>
+  <circle cx="95" cy="100" r="4" fill="#4a6a4a"/>
+
+  <!-- Cardinal direction indicator - N -->
+  <text x="64" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">N</text>
+
+  <!-- Player arrow (center, pointing up/north) -->
+  <polygon points="64,45 54,75 64,67 74,75" fill="#ffffff"/>
+  <polygon points="64,45 54,75 64,67 74,75" fill="none" stroke="#ffffff" stroke-width="1"/>
+
+  <!-- Subtle crosshair to indicate center -->
+  <line x1="64" y1="38" x2="64" y2="42" stroke="#ffffff" stroke-width="1" opacity="0.5"/>
+  <line x1="64" y1="78" x2="64" y2="82" stroke="#ffffff" stroke-width="1" opacity="0.5"/>
+  <line x1="48" y1="60" x2="52" y2="60" stroke="#ffffff" stroke-width="1" opacity="0.5"/>
+  <line x1="76" y1="60" x2="80" y2="60" stroke="#ffffff" stroke-width="1" opacity="0.5"/>
+</svg>
