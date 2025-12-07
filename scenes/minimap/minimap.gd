@@ -113,7 +113,16 @@ var edge_arrows: Control = null
 var trail_renderer: Node3D = null
 var compass_bar: Control = null
 
+var _is_web: bool = false
+
 func _ready() -> void:
+	# Detect web platform - shaders don't work reliably on web
+	_is_web = OS.has_feature("web")
+
+	# Disable shader on web - it causes opacity/rendering issues
+	if _is_web and viewport_container and viewport_container.material:
+		viewport_container.material = null
+
 	_update_size()
 	_update_position()
 	_update_opacity()
@@ -701,7 +710,16 @@ func _update_position() -> void:
 func _update_opacity() -> void:
 	if not is_inside_tree():
 		return
-	# Update shader opacity for the terrain/viewport
+
+	# On web, use modulate instead of shader (shader doesn't work on web)
+	if _is_web:
+		if viewport_container:
+			viewport_container.modulate.a = opacity
+		if shadow:
+			shadow.modulate.a = opacity
+		return
+
+	# On native, use shader opacity for the terrain/viewport
 	if viewport_container and viewport_container.material:
 		viewport_container.material.set_shader_parameter("opacity", opacity)
 	# Also apply to shadow
