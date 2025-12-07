@@ -19,12 +19,21 @@ const MAX_ARROWS := 20  # Max simultaneous edge arrows
 const ARROW_SIZE := Vector2(16, 16)
 const DIAMOND_SIZE := Vector2(16, 16)
 
+var _test_rect: ColorRect = null  # DEBUG: Test visibility
+
 func _ready() -> void:
 	# Load textures
 	if ResourceLoader.exists("res://assets/icons/edge_arrow.svg"):
 		_arrow_texture = load("res://assets/icons/edge_arrow.svg")
 	if ResourceLoader.exists("res://assets/icons/edge_diamond.svg"):
 		_diamond_texture = load("res://assets/icons/edge_diamond.svg")
+
+	# DEBUG: Add a bright red square at center to test if overlays render at all
+	_test_rect = ColorRect.new()
+	_test_rect.color = Color.RED
+	_test_rect.custom_minimum_size = Vector2(20, 20)
+	_test_rect.size = Vector2(20, 20)
+	add_child(_test_rect)
 
 	# Pre-create arrow pool using TextureRect (Control-based for web)
 	for i in MAX_ARROWS:
@@ -49,6 +58,10 @@ func _process(_delta: float) -> void:
 	_update_arrows()
 
 func _update_arrows() -> void:
+	# DEBUG: Position test rect at center
+	if _test_rect:
+		_test_rect.position = size / 2 - Vector2(10, 10)
+
 	if not minimap or not minimap.player:
 		_hide_all()
 		return
