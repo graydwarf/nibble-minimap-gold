@@ -32,7 +32,8 @@ const TYPE_ANIMATIONS := {
 }
 
 var _label_3d: Label3D = null
-var _elevation_label: Label3D = null  # Shows ▲ or ▼
+var _elevation_mesh: MeshInstance3D = null  # 3D triangle for elevation
+var _elevation_material: StandardMaterial3D = null
 var _base_y: float = 2.0
 var _bob_speed: float = 2.0
 var _bob_height: float = 0.5
@@ -126,49 +127,77 @@ func _create_visual() -> void:
 	# Create elevation indicator label (hidden by default)
 	_create_elevation_label()
 
+# Creates a 3D triangle mesh for elevation indicator (web compatible)
 func _create_elevation_label() -> void:
-	_elevation_label = Label3D.new()
-	_elevation_label.name = "ElevationIndicator"
-	_elevation_label.text = ""  # Set dynamically
-	_elevation_label.font_size = 36
-	_elevation_label.pixel_size = 0.04
-	_elevation_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_elevation_label.no_depth_test = true
-	_elevation_label.modulate = marker_color
-	_elevation_label.outline_size = 4
-	_elevation_label.outline_modulate = Color(0.1, 0.1, 0.1)
-	_elevation_label.position.y = _base_y + 1.2  # Above main marker
-	_elevation_label.layers = 1 << (MINIMAP_LAYER - 1)
-	_elevation_label.visible = false
-	_elevation_label.render_priority = 100  # Always on top
-	add_child(_elevation_label)
+	_elevation_mesh = MeshInstance3D.new()
+	_elevation_mesh.name = "ElevationIndicator"
+	_elevation_mesh.mesh = _create_triangle_mesh()
+
+	_elevation_material = StandardMaterial3D.new()
+	_elevation_material.albedo_color = marker_color
+	_elevation_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_elevation_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_elevation_material.render_priority = 100  # Always on top
+	_elevation_mesh.material_override = _elevation_material
+
+	_elevation_mesh.position.y = _base_y + 1.2  # Above main marker
+	_elevation_mesh.layers = 1 << (MINIMAP_LAYER - 1)
+	_elevation_mesh.visible = false
+	add_child(_elevation_mesh)
+
+# Creates a simple triangle mesh (pointing up by default)
+func _create_triangle_mesh() -> ArrayMesh:
+	var mesh := ArrayMesh.new()
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var size := 0.4  # Triangle size
+
+	# Triangle vertices (pointing up)
+	var top := Vector3(0, size / 2, 0)
+	var bottom_left := Vector3(-size / 2, -size / 2, 0)
+	var bottom_right := Vector3(size / 2, -size / 2, 0)
+
+	# Front face
+	surface.add_vertex(top)
+	surface.add_vertex(bottom_left)
+	surface.add_vertex(bottom_right)
+
+	# Back face (reversed for visibility from behind)
+	surface.add_vertex(top)
+	surface.add_vertex(bottom_right)
+	surface.add_vertex(bottom_left)
+
+	surface.generate_normals()
+	surface.commit(mesh)
+	return mesh
 
 func _update_elevation_indicator() -> void:
-	if not show_elevation_indicator or not _elevation_label or not player_ref:
-		if _elevation_label:
-			_elevation_label.visible = false
+	if not show_elevation_indicator or not _elevation_mesh or not player_ref:
+		if _elevation_mesh:
+			_elevation_mesh.visible = false
 		return
 
 	if not is_instance_valid(player_ref):
-		_elevation_label.visible = false
+		_elevation_mesh.visible = false
 		return
 
 	var height_diff := global_position.y - player_ref.global_position.y
 
 	if absf(height_diff) < elevation_threshold:
-		_elevation_label.visible = false
+		_elevation_mesh.visible = false
 	elif height_diff > 0:
-		# Marker is above player
-		_elevation_label.text = "▲"
-		_elevation_label.visible = true
+		# Marker is above player - triangle points up
+		_elevation_mesh.rotation_degrees.z = 0
+		_elevation_mesh.visible = true
 	else:
-		# Marker is below player
-		_elevation_label.text = "▼"
-		_elevation_label.visible = true
+		# Marker is below player - triangle points down (flip 180°)
+		_elevation_mesh.rotation_degrees.z = 180
+		_elevation_mesh.visible = true
 
-	# Sync elevation label position with main label bob
-	if _label_3d and _elevation_label.visible:
-		_elevation_label.position.y = _label_3d.position.y + 1.2
+	# Sync elevation mesh position with main label bob
+	if _label_3d and _elevation_mesh.visible:
+		_elevation_mesh.position.y = _label_3d.position.y + 1.2
 
 func set_player_reference(player: Node3D) -> void:
 	player_ref = player

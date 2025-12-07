@@ -557,11 +557,11 @@ func _update_distance_label() -> void:
 	else:
 		dist_text = "%dm" % int(distance)
 
-	# Set label text
+	# Set label text (no Unicode symbol - edge arrows draw the diamond visually)
 	if waypoint_label.is_empty():
-		_distance_label.text = "◆ %s" % dist_text
+		_distance_label.text = dist_text
 	else:
-		_distance_label.text = "◆ %s - %s" % [waypoint_label, dist_text]
+		_distance_label.text = "%s - %s" % [waypoint_label, dist_text]
 
 	# Determine elevation indicator (icon for above/below, hidden if same level)
 	var waypoint_pos: Vector3 = _waypoints[_active_waypoint_id].position
