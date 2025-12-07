@@ -83,38 +83,39 @@ func _create_visual() -> void:
 
 	_update_visual_state()
 
-# Creates a 3D diamond mesh (two pyramids joined at base)
+# Creates a 3D diamond using two cone meshes (web compatible)
 func _create_diamond_mesh() -> ArrayMesh:
-	var mesh := ArrayMesh.new()
-	var surface := SurfaceTool.new()
-	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-
-	var size := 2.0  # Diamond width/depth
+	var size := 2.0  # Diamond width
 	var height := 3.0  # Total height
 
-	# Diamond vertices: top, middle 4 corners, bottom
-	var top := Vector3(0, height / 2, 0)
-	var bottom := Vector3(0, -height / 2, 0)
-	var front := Vector3(0, 0, size / 2)
-	var back := Vector3(0, 0, -size / 2)
-	var left := Vector3(-size / 2, 0, 0)
-	var right := Vector3(size / 2, 0, 0)
+	# Use two cones joined at base to form diamond shape
+	var top_cone := CylinderMesh.new()
+	top_cone.top_radius = 0.0
+	top_cone.bottom_radius = size / 2.0
+	top_cone.height = height / 2.0
+	top_cone.radial_segments = 4  # Square base for diamond look
 
-	# Top pyramid (4 triangles)
-	surface.add_vertex(top); surface.add_vertex(front); surface.add_vertex(right)
-	surface.add_vertex(top); surface.add_vertex(right); surface.add_vertex(back)
-	surface.add_vertex(top); surface.add_vertex(back); surface.add_vertex(left)
-	surface.add_vertex(top); surface.add_vertex(left); surface.add_vertex(front)
+	var bottom_cone := CylinderMesh.new()
+	bottom_cone.top_radius = size / 2.0
+	bottom_cone.bottom_radius = 0.0
+	bottom_cone.height = height / 2.0
+	bottom_cone.radial_segments = 4
 
-	# Bottom pyramid (4 triangles)
-	surface.add_vertex(bottom); surface.add_vertex(right); surface.add_vertex(front)
-	surface.add_vertex(bottom); surface.add_vertex(back); surface.add_vertex(right)
-	surface.add_vertex(bottom); surface.add_vertex(left); surface.add_vertex(back)
-	surface.add_vertex(bottom); surface.add_vertex(front); surface.add_vertex(left)
+	# Combine into single mesh using SurfaceTool
+	var combined := ArrayMesh.new()
+	var st := SurfaceTool.new()
 
-	surface.generate_normals()
-	surface.commit(mesh)
-	return mesh
+	# Add top cone (offset up)
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(top_cone, 0, Transform3D().translated(Vector3(0, height / 4.0, 0)))
+	st.commit(combined)
+
+	# Add bottom cone (offset down)
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(bottom_cone, 0, Transform3D().translated(Vector3(0, -height / 4.0, 0)))
+	st.commit(combined)
+
+	return combined
 
 func _update_visual_state() -> void:
 	if not _diamond or not _beam or not _diamond_material:

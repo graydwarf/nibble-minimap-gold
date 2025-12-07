@@ -145,32 +145,18 @@ func _create_elevation_label() -> void:
 	_elevation_mesh.visible = false
 	add_child(_elevation_mesh)
 
-# Creates a simple triangle mesh (pointing up by default)
-func _create_triangle_mesh() -> ArrayMesh:
-	var mesh := ArrayMesh.new()
-	var surface := SurfaceTool.new()
-	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+# Creates a simple triangle/cone mesh (pointing up by default, web compatible)
+func _create_triangle_mesh() -> CylinderMesh:
+	var size := 0.5  # Triangle size
 
-	var size := 0.4  # Triangle size
+	# Use a cone (cylinder with 0 top radius) with 3 sides for triangle
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = size / 2.0
+	cone.height = size
+	cone.radial_segments = 3  # Triangle shape
 
-	# Triangle vertices (pointing up)
-	var top := Vector3(0, size / 2, 0)
-	var bottom_left := Vector3(-size / 2, -size / 2, 0)
-	var bottom_right := Vector3(size / 2, -size / 2, 0)
-
-	# Front face
-	surface.add_vertex(top)
-	surface.add_vertex(bottom_left)
-	surface.add_vertex(bottom_right)
-
-	# Back face (reversed for visibility from behind)
-	surface.add_vertex(top)
-	surface.add_vertex(bottom_right)
-	surface.add_vertex(bottom_left)
-
-	surface.generate_normals()
-	surface.commit(mesh)
-	return mesh
+	return cone
 
 func _update_elevation_indicator() -> void:
 	if not show_elevation_indicator or not _elevation_mesh or not player_ref:
@@ -187,12 +173,12 @@ func _update_elevation_indicator() -> void:
 	if absf(height_diff) < elevation_threshold:
 		_elevation_mesh.visible = false
 	elif height_diff > 0:
-		# Marker is above player - triangle points up
-		_elevation_mesh.rotation_degrees.z = 0
+		# Marker is above player - cone points up (default)
+		_elevation_mesh.rotation_degrees.x = 0
 		_elevation_mesh.visible = true
 	else:
-		# Marker is below player - triangle points down (flip 180°)
-		_elevation_mesh.rotation_degrees.z = 180
+		# Marker is below player - cone points down (flip 180° around X)
+		_elevation_mesh.rotation_degrees.x = 180
 		_elevation_mesh.visible = true
 
 	# Sync elevation mesh position with main label bob
