@@ -66,6 +66,10 @@ enum MapView { TOP_DOWN, ANGLED_25D, PERSPECTIVE_3D }
 @export_group("Edge Arrows")
 @export_range(0.0, 0.8) var edge_arrow_inset: float = 0.0  # 0.0 = edges, 0.5 = halfway to center
 
+@export_group("Resource Markers")
+@export var show_resource_markers: bool = true
+@export_range(0.0, 100.0) var resource_marker_distance: float = 20.0  # 0 = always visible
+
 @export_group("Compass Bar")
 @export var compass_bar_enabled: bool = false
 @export var compass_bar_width: float = 400.0
@@ -259,6 +263,10 @@ func add_tracked_marker(target: Node3D, marker_type: String = "enemy", _label: S
 		push_warning("Minimap: Cannot add tracked marker - no world root or target.")
 		return -1
 
+	# Check if resource markers are disabled for loot type
+	if marker_type == "loot" and not show_resource_markers:
+		return -1
+
 	var marker_id := _next_marker_id
 	_next_marker_id += 1
 
@@ -272,10 +280,14 @@ func add_tracked_marker(target: Node3D, marker_type: String = "enemy", _label: S
 	if priority > 0:
 		marker_node.marker_priority = priority
 
+	# Apply resource marker distance for loot type
+	if marker_type == "loot":
+		marker_node.visibility_distance = resource_marker_distance
+
 	_world_root.add_child(marker_node)
 	marker_node.global_position = target.global_position
 
-	# Set player reference for elevation indicators
+	# Set player reference for elevation indicators and proximity visibility
 	if player and marker_node.has_method("set_player_reference"):
 		marker_node.set_player_reference(player)
 

@@ -51,6 +51,10 @@ var player_ref: Node3D = null
 var elevation_threshold: float = 3.0  # Min height difference to show indicator
 var show_elevation_indicator: bool = true
 
+# Proximity visibility - markers only show when player is within this distance
+var visibility_distance: float = 25.0  # 0 = always visible, >0 = only show within distance
+var _is_visible_by_distance: bool = false
+
 func _ready() -> void:
 	# Randomize starting phase so markers don't all bob in sync
 	_time = randf() * TAU
@@ -63,6 +67,11 @@ func _process(delta: float) -> void:
 	# Get the active visual node (either mesh or label)
 	var visual_node: Node3D = _marker_mesh if _marker_mesh else _label_3d
 	if not visual_node:
+		return
+
+	# Proximity-based visibility
+	_update_proximity_visibility(visual_node)
+	if not _is_visible_by_distance:
 		return
 
 	# Bob up and down
@@ -94,6 +103,37 @@ func _process(delta: float) -> void:
 
 	# Update elevation indicator
 	_update_elevation_indicator()
+
+# Updates visibility based on player distance
+func _update_proximity_visibility(visual_node: Node3D) -> void:
+	# If visibility_distance is 0, always visible
+	if visibility_distance <= 0.0:
+		_is_visible_by_distance = true
+		visual_node.visible = true
+		if _elevation_mesh:
+			_elevation_mesh.visible = show_elevation_indicator
+		return
+
+	# Check distance to player
+	if not player_ref or not is_instance_valid(player_ref):
+		_is_visible_by_distance = false
+		visual_node.visible = false
+		if _elevation_mesh:
+			_elevation_mesh.visible = false
+		return
+
+	var distance := global_position.distance_to(player_ref.global_position)
+	var should_be_visible := distance <= visibility_distance
+
+	if should_be_visible != _is_visible_by_distance:
+		_is_visible_by_distance = should_be_visible
+		visual_node.visible = should_be_visible
+		# Reset fade when becoming visible
+		if should_be_visible:
+			_fade_progress = 0.0
+
+	if not _is_visible_by_distance and _elevation_mesh:
+		_elevation_mesh.visible = false
 
 const MINIMAP_LAYER := 20  # Layer 20 for minimap-only objects
 
