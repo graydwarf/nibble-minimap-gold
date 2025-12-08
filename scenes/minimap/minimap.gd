@@ -64,11 +64,11 @@ enum MapView { TOP_DOWN, ANGLED_25D, PERSPECTIVE_3D }
 @export var minimap_theme: Resource = null  # MinimapTheme resource
 
 @export_group("Edge Arrows")
-@export_range(0.0, 0.99) var edge_arrow_inset: float = 0.95  # 0.0 = edges, 1.0 = center (testing)
+@export_range(0.0, 0.99) var edge_arrow_inset: float = 0.1  # 0.0 = at edges, 1.0 = at center
 
 @export_group("Marker Visibility")
 @export var show_resource_markers: bool = true
-@export_range(0.0, 100.0) var marker_view_distance: float = 40.0  # 0 = always visible, affects loot and enemy markers
+@export_range(5.0, 100.0) var marker_view_distance: float = 40.0  # Min 5 to ensure markers visible when close, affects loot and enemy markers
 
 @export_group("Compass Bar")
 @export var compass_bar_enabled: bool = false
@@ -129,6 +129,7 @@ var _is_web: bool = false
 const EDGE_ARROW_LAYER := 20
 const MAX_EDGE_ARROWS := 20
 const EDGE_ARROW_HEIGHT := 10.0
+const EDGE_ARROW_BASE_ORTHO := 100.0  # Reference ortho_size for arrow scaling
 
 var _edge_arrow_pool: Array[MeshInstance3D] = []
 var _edge_arrow_materials: Array[StandardMaterial3D] = []
@@ -148,9 +149,11 @@ var _waypoint_arrow_color: Color = Color(0.8, 0.5, 1.0)
 func _ready() -> void:
 	# Detect web platform - shaders don't work reliably on web
 	_is_web = OS.has_feature("web")
+	print("[MINIMAP] _ready called, _is_web=%s, opacity=%s" % [_is_web, opacity])
 
 	# Disable shader on web - it causes opacity/rendering issues
 	if _is_web and viewport_container and viewport_container.material:
+		print("[MINIMAP] Nulling shader material for web")
 		viewport_container.material = null
 
 	_update_size()
@@ -165,6 +168,12 @@ func _ready() -> void:
 	# Handle viewport resize (fullscreen, window resize)
 	get_tree().root.size_changed.connect(_update_position)
 
+	# Web fix: Defer opacity update to ensure it applies after everything is fully initialized
+	# NOTE: call_deferred("method_name") doesn't work on web - use timer instead
+	if _is_web:
+		print("[MINIMAP] Scheduling deferred _update_opacity for web via timer")
+		get_tree().create_timer(0.0).timeout.connect(_update_opacity_web)
+
 func _process(_delta: float) -> void:
 	if player:
 		_update_camera_position()
@@ -173,6 +182,52 @@ func _process(_delta: float) -> void:
 		_update_tracked_markers()
 		_update_trail()
 		_update_integrated_edge_arrows()
+		# Always update loot/enemy marker visibility from minimap (more reliable than per-marker scripts)
+		_update_marker_visibility()
+
+# Debug counter to avoid spamming logs
+var _visibility_log_counter: int = 0
+
+# Directly control loot/enemy marker visibility (more reliable than per-marker scripts, especially on web)
+func _update_marker_visibility() -> void:
+	if not player:
+		return
+	var player_pos := player.global_position
+
+	# Log every 60 frames (once per second at 60fps)
+	_visibility_log_counter += 1
+	var should_log := _visibility_log_counter >= 60
+	if should_log:
+		_visibility_log_counter = 0
+		print("[MINIMAP] _update_marker_visibility: marker_view_distance=%s, tracked_markers=%d" % [marker_view_distance, _tracked_markers.size()])
+
+	# Update static markers
+	for marker_id: int in _markers:
+		var data: Dictionary = _markers[marker_id]
+		var node: Node3D = data.node
+		var marker_type: String = data.get("type", "default")
+		if node and marker_type in ["loot", "enemy"]:
+			var distance := node.global_position.distance_to(player_pos)
+			var should_show := distance <= marker_view_distance
+			# Use method for web compatibility
+			if node.has_method("set_visibility_from_minimap"):
+				node.set_visibility_from_minimap(should_show)
+			else:
+				node.visible = should_show
+
+	# Update tracked markers
+	for marker_id: int in _tracked_markers:
+		var data: Dictionary = _tracked_markers[marker_id]
+		var node: Node3D = data.node
+		var marker_type: String = data.get("type", "default")
+		if node and marker_type in ["loot", "enemy"]:
+			var distance := node.global_position.distance_to(player_pos)
+			var should_show := distance <= marker_view_distance
+			# Use method for web compatibility
+			if node.has_method("set_visibility_from_minimap"):
+				node.set_visibility_from_minimap(should_show)
+			else:
+				node.visible = should_show
 
 func _input(event: InputEvent) -> void:
 	if not zoom_enabled:
@@ -247,13 +302,25 @@ func add_marker(world_position: Vector3, marker_type: String = "default", _label
 	_world_root.add_child(marker_node)
 	marker_node.global_position = world_position
 
-	# Set player reference for elevation indicators
-	if player and marker_node.has_method("set_player_reference"):
-		marker_node.set_player_reference(player)
-
 	# Call setup() to create visuals now that properties are set
 	if marker_node.has_method("setup"):
 		marker_node.setup()
+
+	# Web fix: Apply ALL properties AFTER setup() to ensure they persist
+	if marker_node.has_method("set_marker_color"):
+		marker_node.set_marker_color(color)
+
+	# Set visibility distance for loot/enemy markers (AFTER setup for web)
+	# Also mark as externally managed so minimap controls visibility
+	if marker_type in ["loot", "enemy"]:
+		if marker_node.has_method("set_visibility_distance"):
+			marker_node.set_visibility_distance(marker_view_distance)
+		# Tell marker that minimap will control visibility
+		marker_node.set("visibility_managed_externally", true)
+
+	# Set player reference AFTER setup() for web compatibility
+	if player and marker_node.has_method("set_player_reference"):
+		marker_node.set_player_reference(player)
 
 	_markers[marker_id] = {
 		"node": marker_node,
@@ -327,13 +394,23 @@ func add_tracked_marker(target: Node3D, marker_type: String = "enemy", _label: S
 	_world_root.add_child(marker_node)
 	marker_node.global_position = target.global_position
 
-	# Set player reference for elevation indicators and proximity visibility
-	if player and marker_node.has_method("set_player_reference"):
-		marker_node.set_player_reference(player)
-
 	# Call setup() to create visuals now that properties are set
 	if marker_node.has_method("setup"):
 		marker_node.setup()
+
+	# Web fix: Apply ALL properties AFTER setup() to ensure they persist
+	if marker_node.has_method("set_marker_color"):
+		marker_node.set_marker_color(color)
+
+	if marker_type in ["loot", "enemy"]:
+		if marker_node.has_method("set_visibility_distance"):
+			marker_node.set_visibility_distance(marker_view_distance)
+		# Tell marker that minimap will control visibility
+		marker_node.set("visibility_managed_externally", true)
+
+	# Set player reference AFTER setup() for web compatibility
+	if player and marker_node.has_method("set_player_reference"):
+		marker_node.set_player_reference(player)
 
 	_tracked_markers[marker_id] = {
 		"node": marker_node,
@@ -504,6 +581,13 @@ func get_waypoints() -> Dictionary:
 func get_active_waypoint_id() -> int:
 	return _active_waypoint_id
 
+func get_marker_view_distance() -> float:
+	return marker_view_distance
+
+func set_marker_view_distance(value: float) -> void:
+	marker_view_distance = value
+	print("[MINIMAP] set_marker_view_distance called with %s, actual=%s" % [value, marker_view_distance])
+
 # ============ END GETTERS ============
 
 # Sets the camera view mode at runtime
@@ -583,35 +667,17 @@ func _create_cardinal_indicator() -> void:
 	cardinal_indicator.visible = show_cardinal_directions
 
 func _create_edge_arrows() -> void:
-	# Use 3D arrows (works on web and native)
-	# They render on the minimap layer and are positioned in world space
-	if _world_root:
+	# Native: use edge_arrows_3d.gd (3D arrows on minimap layer)
+	# Web: uses integrated edge arrows updated in _process via _update_integrated_edge_arrows()
+	if _world_root and not _is_web:
 		_create_edge_arrows_3d()
 
-	# Also create 2D arrows for native (faster, but doesn't work on web)
-	if not _is_web:
-		edge_arrows = Control.new()
-		edge_arrows.name = "EdgeArrows"
-		edge_arrows.set_script(preload("res://scenes/minimap/edge_arrows.gd"))
-		edge_arrows.minimap = self
-		edge_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		edge_arrows.edge_inset = edge_arrow_inset
-		edge_arrows.position = Vector2.ZERO
-		edge_arrows.size = Vector2(map_size)
-		add_child(edge_arrows)
-		edge_arrows.move_to_front()
-
 func _create_edge_arrows_3d() -> void:
-	# Web uses integrated edge arrows in minimap.gd directly
-	# because dynamically instantiated scripts can't have properties set on web
-	if _is_web:
-		DebugConsole.log("[Minimap] _create_edge_arrows_3d() SKIPPED (using integrated edge arrows for web)")
+	# Only create on native builds - web uses integrated arrows
+	if _is_web or edge_arrows_3d or not _world_root:
 		return
 
-	if edge_arrows_3d or not _world_root:
-		return
-
-	# Native only: use separate edge_arrows_3d script
+	# Native: use separate edge_arrows_3d script
 	var edge_arrows_scene := preload("res://scenes/minimap/edge_arrows_3d.tscn")
 	edge_arrows_3d = edge_arrows_scene.instantiate()
 	_world_root.add_child(edge_arrows_3d)
@@ -806,33 +872,36 @@ func _update_position() -> void:
 
 func _update_opacity() -> void:
 	if not is_inside_tree():
+		print("[MINIMAP] _update_opacity: not in tree, skipping")
 		return
 
-	# On web, use modulate instead of shader (shader doesn't work on web)
-	# IMPORTANT: Only set modulate on the parent Minimap control, NOT on children
-	# Setting on multiple nodes causes multiplicative alpha (0.85 * 0.85 = 0.72)
+	print("[MINIMAP] _update_opacity: _is_web=%s, opacity=%s" % [_is_web, opacity])
+
 	if _is_web:
-		# Reset children to full opacity to avoid multiplication
-		if viewport_container:
-			viewport_container.modulate.a = 1.0
-			viewport_container.self_modulate.a = 1.0
+		# Web: apply modulate to entire minimap (self) for consistent opacity
+		# This affects viewport_container, shadow, and all overlays uniformly
+		self.modulate.a = opacity
+		print("[MINIMAP] Web: set self.modulate.a = %s, actual=%s" % [opacity, self.modulate.a])
+	else:
+		# Native: use shader for viewport opacity (preserves rounded corners)
+		if viewport_container and viewport_container.material:
+			viewport_container.material.set_shader_parameter("opacity", opacity)
+		# Shadow uses modulate on native
 		if shadow:
-			shadow.self_modulate.a = 1.0
-		# Set opacity only on parent control
-		modulate.a = opacity
-		return
+			shadow.modulate.a = opacity
 
-	# On native, use shader opacity for the terrain/viewport
-	if viewport_container and viewport_container.material:
-		viewport_container.material.set_shader_parameter("opacity", opacity)
-	# Also apply to shadow
-	if shadow:
-		shadow.modulate.a = opacity
+# Web-safe wrapper for deferred opacity update (timer callback)
+func _update_opacity_web() -> void:
+	_update_opacity()
 
 # Public method for config dialog to call
 func set_opacity(value: float) -> void:
 	opacity = value
 	_update_opacity()
+
+# Public getter for web compatibility (properties not always accessible on web)
+func get_opacity() -> float:
+	return opacity
 
 # Public method for config dialog to toggle cardinals
 func set_cardinals_visible(visible_flag: bool) -> void:
@@ -991,8 +1060,6 @@ func _setup_integrated_edge_arrows() -> void:
 	if _edge_arrow_pool.size() > 0:
 		return  # Already setup
 
-	DebugConsole.log("[Minimap] _setup_integrated_edge_arrows()")
-
 	var cone_mesh := _create_edge_cone_mesh()
 
 	for i in MAX_EDGE_ARROWS:
@@ -1022,43 +1089,45 @@ func _setup_integrated_edge_arrows() -> void:
 	_waypoint_arrow.material_override = _waypoint_material
 	_world_root.add_child(_waypoint_arrow)
 
-	DebugConsole.log("[Minimap] edge arrows created: %d arrows + 1 waypoint" % MAX_EDGE_ARROWS)
-
 func _create_edge_cone_mesh() -> CylinderMesh:
 	var cone := CylinderMesh.new()
 	cone.top_radius = 0.0
-	cone.bottom_radius = 1.5
-	cone.height = 3.0
+	cone.bottom_radius = 0.75
+	cone.height = 1.5
 	cone.radial_segments = 8
 	return cone
 
 func _create_edge_diamond_mesh() -> ArrayMesh:
 	var top := CylinderMesh.new()
 	top.top_radius = 0.0
-	top.bottom_radius = 1.5
-	top.height = 2.0
+	top.bottom_radius = 0.75
+	top.height = 1.0
 	top.radial_segments = 4
 
 	var bottom := CylinderMesh.new()
-	bottom.top_radius = 1.5
+	bottom.top_radius = 0.75
 	bottom.bottom_radius = 0.0
-	bottom.height = 2.0
+	bottom.height = 1.0
 	bottom.radial_segments = 4
 
 	var combined := ArrayMesh.new()
 	var st := SurfaceTool.new()
 
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	st.append_from(top, 0, Transform3D().translated(Vector3(0, 1.0, 0)))
+	st.append_from(top, 0, Transform3D().translated(Vector3(0, 0.5, 0)))
 	st.commit(combined)
 
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	st.append_from(bottom, 0, Transform3D().translated(Vector3(0, -1.0, 0)))
+	st.append_from(bottom, 0, Transform3D().translated(Vector3(0, -0.5, 0)))
 	st.commit(combined)
 
 	return combined
 
 func _update_integrated_edge_arrows() -> void:
+	# Only run on web builds - native uses edge_arrows_3d.gd
+	if not _is_web:
+		return
+
 	# Setup arrows if not done yet
 	if _edge_arrow_pool.size() == 0 and _world_root:
 		_setup_integrated_edge_arrows()
@@ -1098,10 +1167,17 @@ func _check_edge_marker(marker_data: Dictionary, player_pos: Vector3, ortho_size
 	var marker_type: String = marker_data.get("type", "default")
 
 	# Check loot visibility settings
-	if marker_type == "loot":
-		if not show_resource_markers:
-			return
-		if marker_node.get("_is_visible_by_distance") == false:
+	if marker_type == "loot" and not show_resource_markers:
+		return
+
+	# Check proximity visibility for loot and enemy markers (use getter for web compatibility)
+	if marker_type in ["loot", "enemy"]:
+		var is_visible_by_dist: bool = true
+		if marker_node.has_method("get_is_visible_by_distance"):
+			is_visible_by_dist = marker_node.get_is_visible_by_distance()
+		else:
+			is_visible_by_dist = marker_node.get("_is_visible_by_distance") != false
+		if not is_visible_by_dist:
 			return
 
 	var marker_pos := marker_node.global_position
@@ -1129,8 +1205,13 @@ func _check_edge_marker(marker_data: Dictionary, player_pos: Vector3, ortho_size
 		player_pos.z + edge_offset.y
 	)
 
-	var angle := atan2(direction.y, direction.x)
-	arrow.rotation = Vector3(PI/2, 0, -angle + PI/2)
+	# Rotate to point outward - atan2(x, z) gives angle from +Z toward +X, rotate around Y
+	var angle := atan2(direction.x, direction.y)
+	arrow.rotation = Vector3(PI/2, angle, 0)
+
+	# Scale to maintain constant visual size regardless of zoom
+	var scale_factor := ortho_size / EDGE_ARROW_BASE_ORTHO * 3.0
+	arrow.scale = Vector3.ONE * scale_factor
 
 	var color: Color = EDGE_ARROW_COLORS.get(marker_type, EDGE_ARROW_COLORS["default"])
 	mat.albedo_color = color
@@ -1167,6 +1248,14 @@ func _update_edge_waypoint(player_pos: Vector3, ortho_size: float) -> void:
 		player_pos.y + EDGE_ARROW_HEIGHT,
 		player_pos.z + edge_offset.y
 	)
+
+	# Rotate to point toward waypoint - atan2(x, z) gives angle from +Z toward +X, rotate around Y
+	var angle := atan2(direction.x, direction.y)
+	_waypoint_arrow.rotation = Vector3(PI/2, angle, 0)
+
+	# Scale to maintain constant visual size regardless of zoom
+	var scale_factor := ortho_size / EDGE_ARROW_BASE_ORTHO * 3.0
+	_waypoint_arrow.scale = Vector3.ONE * scale_factor
 
 	_waypoint_material.albedo_color = wp_color
 	_waypoint_arrow.visible = true

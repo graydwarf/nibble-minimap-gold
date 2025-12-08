@@ -85,8 +85,8 @@ func _create_visual() -> void:
 
 # Creates a 3D diamond using two cone meshes (web compatible)
 func _create_diamond_mesh() -> ArrayMesh:
-	var size := 2.0  # Diamond width
-	var height := 3.0  # Total height
+	var size := 1.0  # Diamond width
+	var height := 1.5  # Total height
 
 	# Use two cones joined at base to form diamond shape
 	var top_cone := CylinderMesh.new()

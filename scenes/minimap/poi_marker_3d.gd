@@ -31,7 +31,6 @@ const TYPE_ANIMATIONS := {
 	"objective": AnimationType.HIGHLIGHT,
 }
 
-var _label_3d: Label3D = null  # Used for "?" default marker
 var _marker_mesh: MeshInstance3D = null  # Used for dots/stars (web compatible)
 var _marker_material: StandardMaterial3D = null
 var _elevation_mesh: MeshInstance3D = null  # 3D triangle for elevation
@@ -54,6 +53,7 @@ var show_elevation_indicator: bool = true
 # Proximity visibility - markers only show when player is within this distance
 var visibility_distance: float = 40.0  # 0 = always visible, >0 = only show within distance
 var _is_visible_by_distance: bool = false
+var visibility_managed_externally: bool = false  # When true, minimap controls visibility instead of this script
 
 var _setup_complete: bool = false
 
@@ -67,25 +67,22 @@ func setup() -> void:
 	if _setup_complete:
 		return
 	_setup_complete = true
-	print("[POI] setup() called, type=", marker_type, " pos=", global_position)
 	_create_visual()
 
 func _process(delta: float) -> void:
 	_time += delta * _bob_speed
 	_pulse_time += delta * 4.0  # Pulse speed
 
-	# Get the active visual node (either mesh or label)
-	var visual_node: Node3D = _marker_mesh if _marker_mesh else _label_3d
-	if not visual_node:
+	if not _marker_mesh:
 		return
 
 	# Proximity-based visibility
-	_update_proximity_visibility(visual_node)
+	_update_proximity_visibility(_marker_mesh)
 	if not _is_visible_by_distance:
 		return
 
 	# Bob up and down
-	visual_node.position.y = _base_y + sin(_time) * _bob_height
+	_marker_mesh.position.y = _base_y + sin(_time) * _bob_height
 
 	# Fade-in animation
 	if _fade_progress < 1.0:
@@ -96,7 +93,7 @@ func _process(delta: float) -> void:
 	if animation_type == AnimationType.PULSE or is_highlighted:
 		var pulse_amount := 0.15 if is_highlighted else 0.1
 		var pulse := 1.0 + sin(_pulse_time) * pulse_amount
-		visual_node.scale = Vector3.ONE * _base_scale * pulse
+		_marker_mesh.scale = Vector3.ONE * _base_scale * pulse
 
 	# Highlight animation (brightness boost)
 	if is_highlighted:
@@ -107,21 +104,13 @@ func _process(delta: float) -> void:
 			glow_color.a = marker_color.a * _fade_progress
 			_marker_material.albedo_color = glow_color
 
-		if _label_3d:
-			_label_3d.modulate = marker_color * glow
-			_label_3d.modulate.a = marker_color.a * _fade_progress
-
 	# Update elevation indicator
 	_update_elevation_indicator()
 
 # Updates visibility based on player distance
 func _update_proximity_visibility(visual_node: Node3D) -> void:
-	# If visibility_distance is 0, always visible
-	if visibility_distance <= 0.0:
-		_is_visible_by_distance = true
-		visual_node.visible = true
-		if _elevation_mesh:
-			_elevation_mesh.visible = show_elevation_indicator
+	# Skip if minimap is managing visibility externally
+	if visibility_managed_externally:
 		return
 
 	# Check distance to player
@@ -148,15 +137,12 @@ func _update_proximity_visibility(visual_node: Node3D) -> void:
 const MINIMAP_LAYER := 20  # Layer 20 for minimap-only objects
 
 func _create_visual() -> void:
-	# Use 3D meshes for enemy/friendly/loot (web compatible)
-	# Use Label3D only for default "?" marker
+	# Use 3D meshes for all marker types (web compatible)
 	match marker_type:
-		"enemy", "friendly":
-			_create_sphere_marker(0.8)  # Dot
 		"loot":
 			_create_star_marker()  # Diamond/star shape
 		_:
-			_create_label_marker()  # "?" text
+			_create_sphere_marker(0.4)  # Dot for enemy, friendly, default
 
 	# Apply default animation for this marker type
 	if animation_type == AnimationType.NONE:
@@ -176,9 +162,8 @@ func _create_visual() -> void:
 func _create_sphere_marker(size: float) -> void:
 	_marker_mesh = MeshInstance3D.new()
 	var sphere := SphereMesh.new()
-	# DEBUG: Make bigger for visibility testing
-	sphere.radius = size * 2.0
-	sphere.height = size * 4.0
+	sphere.radius = size * 1.0
+	sphere.height = size * 2.0
 	sphere.radial_segments = 16
 	sphere.rings = 8
 	_marker_mesh.mesh = sphere
@@ -196,9 +181,8 @@ func _create_sphere_marker(size: float) -> void:
 func _create_star_marker() -> void:
 	_marker_mesh = MeshInstance3D.new()
 
-	# DEBUG: Make bigger for visibility testing
-	var size := 3.0
-	var height := 4.0
+	var size := 1.5
+	var height := 2.0
 
 	var top_cone := CylinderMesh.new()
 	top_cone.top_radius = 0.0
@@ -234,21 +218,6 @@ func _create_star_marker() -> void:
 	_marker_mesh.position.y = _base_y
 	_marker_mesh.layers = 1 << (MINIMAP_LAYER - 1)
 	add_child(_marker_mesh)
-
-# Creates a Label3D marker (for default "?" only)
-func _create_label_marker() -> void:
-	_label_3d = Label3D.new()
-	_label_3d.text = "?"
-	_label_3d.font_size = 72
-	_label_3d.pixel_size = 0.05
-	_label_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label_3d.no_depth_test = true
-	_label_3d.modulate = marker_color
-	_label_3d.outline_size = 8
-	_label_3d.outline_modulate = Color(0.1, 0.1, 0.1)
-	_label_3d.position.y = _base_y
-	_label_3d.layers = 1 << (MINIMAP_LAYER - 1)
-	add_child(_label_3d)
 
 # Creates a 3D triangle mesh for elevation indicator (web compatible)
 func _create_elevation_label() -> void:
@@ -305,10 +274,8 @@ func _update_elevation_indicator() -> void:
 		_elevation_mesh.visible = true
 
 	# Sync elevation mesh position with main marker bob
-	if _elevation_mesh.visible:
-		var visual_node: Node3D = _marker_mesh if _marker_mesh else _label_3d
-		if visual_node:
-			_elevation_mesh.position.y = visual_node.position.y + 1.2
+	if _elevation_mesh.visible and _marker_mesh:
+		_elevation_mesh.position.y = _marker_mesh.position.y + 1.2
 
 func set_player_reference(player: Node3D) -> void:
 	player_ref = player
@@ -316,18 +283,10 @@ func set_player_reference(player: Node3D) -> void:
 func _update_fade() -> void:
 	var alpha := marker_color.a * _fade_progress
 
-	# Handle mesh-based markers (enemy, friendly, loot)
 	if _marker_mesh and _marker_material:
 		var faded_color := marker_color
 		faded_color.a = alpha
 		_marker_material.albedo_color = faded_color
-
-	# Handle Label3D markers (default "?")
-	if _label_3d:
-		_label_3d.modulate.a = alpha
-		# Also fade the outline
-		var outline_alpha := 0.8 * _fade_progress  # Outline slightly transparent
-		_label_3d.outline_modulate.a = outline_alpha
 
 func _apply_priority() -> void:
 	# Use type priority if marker_priority not set explicitly
@@ -335,13 +294,8 @@ func _apply_priority() -> void:
 	if priority == 0:
 		priority = TYPE_PRIORITIES.get(marker_type, 10)
 
-	# Apply to mesh-based markers
 	if _marker_mesh and _marker_material:
 		_marker_material.render_priority = priority
-
-	# Apply to Label3D markers
-	if _label_3d:
-		_label_3d.render_priority = priority
 
 func set_priority(priority: int) -> void:
 	marker_priority = priority
@@ -361,11 +315,6 @@ func set_highlighted(highlighted: bool) -> void:
 				reset_color.a = marker_color.a * _fade_progress
 				_marker_material.albedo_color = reset_color
 
-		if _label_3d:
-			_label_3d.scale = Vector3.ONE * _base_scale
-			_label_3d.modulate = marker_color
-			_label_3d.modulate.a = marker_color.a * _fade_progress
-
 func set_marker_color(color: Color) -> void:
 	marker_color = color
 
@@ -377,6 +326,15 @@ func set_marker_color(color: Color) -> void:
 	if _elevation_mesh and _elevation_material:
 		_elevation_material.albedo_color = color
 
-	# Update Label3D markers
-	if _label_3d:
-		_label_3d.modulate = color
+func set_visibility_distance(distance: float) -> void:
+	visibility_distance = distance
+
+# Called by minimap to control visibility directly (web compatible)
+func set_visibility_from_minimap(is_visible: bool) -> void:
+	_is_visible_by_distance = is_visible
+	# Don't hide the marker mesh - only the arrows should be affected by view distance
+	# The marker stays visible in the minimap view regardless
+
+# Getter for web compatibility - used by edge arrows to determine if arrow should show
+func get_is_visible_by_distance() -> bool:
+	return _is_visible_by_distance

@@ -1,16 +1,14 @@
 extends Node3D
 ## 3D edge arrows that appear at minimap edges pointing to off-screen markers.
-## Uses 3D cone meshes on minimap layer for web compatibility.
+## Uses 3D cone meshes on minimap layer. Native builds only (web uses integrated arrows in minimap.gd).
 
 var minimap: Control = null
 var player: Node3D = null
 
-# Explicit initialization for web compatibility
-# Direct property assignment doesn't work on dynamically instantiated scripts on web
+# Explicit initialization for native builds
 func initialize(minimap_ref: Control, player_ref: Node3D) -> void:
 	minimap = minimap_ref
 	player = player_ref
-	DebugConsole.log("[EdgeArrows3D] initialize() minimap=%s player=%s" % [str(minimap != null), str(player != null)])
 
 # Color scheme by marker type
 const MARKER_COLORS := {
@@ -25,7 +23,7 @@ var waypoint_color: Color = Color(0.8, 0.5, 1.0)  # Purple
 const MINIMAP_LAYER := 20
 const MAX_ARROWS := 20
 const ARROW_HEIGHT := 10.0  # Height above player (must be BELOW camera at Y=50)
-const EDGE_DISTANCE := 25.0  # Distance from player to place arrows
+const BASE_ORTHO_SIZE := 100.0  # Reference ortho_size for arrow scaling
 
 var _arrow_pool: Array[MeshInstance3D] = []
 var _arrow_materials: Array[StandardMaterial3D] = []
@@ -34,14 +32,7 @@ var _waypoint_arrow: MeshInstance3D = null
 var _waypoint_material: StandardMaterial3D = null
 
 func _ready() -> void:
-	DebugConsole.log("[EdgeArrows3D] _ready() called")
-	# Explicitly enable processing - web might not auto-register _process for dynamic scripts
 	set_process(true)
-	DebugConsole.log("[EdgeArrows3D] set_process(true) called")
-
-	# Test timer to verify node is alive
-	var timer := get_tree().create_timer(1.0)
-	timer.timeout.connect(_on_test_timer)
 
 	# Create arrow mesh pool
 	var cone_mesh := _create_cone_mesh()
@@ -73,14 +64,11 @@ func _ready() -> void:
 	_waypoint_arrow.material_override = _waypoint_material
 	add_child(_waypoint_arrow)
 
-func _on_test_timer() -> void:
-	DebugConsole.log("[EdgeArrows3D] timer fired - node is alive, minimap=%s player=%s" % [str(minimap != null), str(player != null)])
-
 func _create_cone_mesh() -> CylinderMesh:
 	var cone := CylinderMesh.new()
 	cone.top_radius = 0.0
-	cone.bottom_radius = 1.5
-	cone.height = 3.0
+	cone.bottom_radius = 0.75
+	cone.height = 1.5
 	cone.radial_segments = 8
 	return cone
 
@@ -88,75 +76,42 @@ func _create_diamond_mesh() -> ArrayMesh:
 	# Two cones for diamond shape
 	var top := CylinderMesh.new()
 	top.top_radius = 0.0
-	top.bottom_radius = 1.5
-	top.height = 2.0
+	top.bottom_radius = 0.75
+	top.height = 1.0
 	top.radial_segments = 4
 
 	var bottom := CylinderMesh.new()
-	bottom.top_radius = 1.5
+	bottom.top_radius = 0.75
 	bottom.bottom_radius = 0.0
-	bottom.height = 2.0
+	bottom.height = 1.0
 	bottom.radial_segments = 4
 
 	var combined := ArrayMesh.new()
 	var st := SurfaceTool.new()
 
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	st.append_from(top, 0, Transform3D().translated(Vector3(0, 1.0, 0)))
+	st.append_from(top, 0, Transform3D().translated(Vector3(0, 0.5, 0)))
 	st.commit(combined)
 
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	st.append_from(bottom, 0, Transform3D().translated(Vector3(0, -1.0, 0)))
+	st.append_from(bottom, 0, Transform3D().translated(Vector3(0, -0.5, 0)))
 	st.commit(combined)
 
 	return combined
 
-var _debug_timer: float = 0.0
-var _frame_count: int = 0
-
-func _process(delta: float) -> void:
-	_frame_count += 1
-
-	# Log first few frames to see what's happening
-	if _frame_count <= 3:
-		DebugConsole.log("[EdgeArrows3D] frame %d: minimap=%s player=%s" % [_frame_count, str(minimap != null), str(player != null)])
-
+func _process(_delta: float) -> void:
 	if not minimap or not player:
-		if _frame_count <= 3:
-			DebugConsole.log("[EdgeArrows3D] frame %d: early return (null refs)" % _frame_count)
 		_hide_all()
 		return
 
 	_arrow_index = 0
 
-	# Debug: check if property access works
-	if _frame_count <= 5:
-		DebugConsole.log("[EdgeArrows3D] frame %d: getting player_pos..." % _frame_count)
-
 	var player_pos := player.global_position
-
-	if _frame_count <= 5:
-		DebugConsole.log("[EdgeArrows3D] frame %d: player_pos OK, getting ortho_size..." % _frame_count)
-
 	var ortho_size: float = minimap.camera_ortho_size
 
-	if _frame_count <= 5:
-		DebugConsole.log("[EdgeArrows3D] frame %d: ortho_size=%.1f" % [_frame_count, ortho_size])
-
-	# Debug logging every 2 seconds
-	_debug_timer += delta
-	if _debug_timer >= 2.0:
-		_debug_timer = 0.0
-		DebugConsole.log("[EdgeArrows3D] 2s tick - about to get marker count")
-		# Use getter methods for web compatibility (direct property access crashes on web)
-		var markers := minimap.get_markers()
-		var tracked_markers := minimap.get_tracked_markers()
-		var marker_count: int = markers.size() + tracked_markers.size()
-		DebugConsole.log("[EdgeArrows3D] markers=%d, visible_radius=%.1f, arrows=%d" % [marker_count, ortho_size / 2.0 * 0.9, _arrow_index])
-
-	# Use getter methods for web compatibility (direct property access crashes on web)
-	var markers := minimap.get_markers()
-	var tracked_markers := minimap.get_tracked_markers()
+	# Use getter methods for compatibility
+	var markers: Dictionary = minimap.get_markers()
+	var tracked_markers: Dictionary = minimap.get_tracked_markers()
 
 	# Check static markers
 	for marker_id in markers:
@@ -169,10 +124,6 @@ func _process(delta: float) -> void:
 		if _arrow_index >= MAX_ARROWS:
 			break
 		_check_marker(tracked_markers[marker_id], player_pos, ortho_size)
-
-	# Debug: how many arrows are visible?
-	if _debug_timer == 0.0:
-		DebugConsole.log("arrows_visible=%d" % _arrow_index)
 
 	# Hide unused arrows
 	for i in range(_arrow_index, MAX_ARROWS):
@@ -189,10 +140,11 @@ func _check_marker(marker_data: Dictionary, player_pos: Vector3, ortho_size: flo
 	var marker_type: String = marker_data.get("type", "default")
 
 	# Check loot visibility settings
-	if marker_type == "loot":
-		if not minimap.show_resource_markers:
-			return
-		# Check proximity visibility
+	if marker_type == "loot" and not minimap.show_resource_markers:
+		return
+
+	# Check proximity visibility for loot and enemy markers
+	if marker_type in ["loot", "enemy"]:
 		if marker_node.get("_is_visible_by_distance") == false:
 			return
 
@@ -207,7 +159,7 @@ func _check_marker(marker_data: Dictionary, player_pos: Vector3, ortho_size: flo
 	if distance <= visible_radius:
 		return
 
-	# Position arrow near center for testing (edge_arrow_inset from minimap)
+	# Position arrow based on edge_arrow_inset from minimap
 	var direction := flat_offset.normalized()
 	var inset: float = minimap.edge_arrow_inset
 	var arrow_distance: float = ortho_size / 2.0 * (1.0 - inset)
@@ -225,8 +177,13 @@ func _check_marker(marker_data: Dictionary, player_pos: Vector3, ortho_size: flo
 	)
 
 	# Rotate to point outward (cone points down by default, we want it pointing in direction)
-	var angle := atan2(direction.y, direction.x)
-	arrow.rotation = Vector3(PI/2, 0, -angle + PI/2)
+	# atan2(x, z) gives angle from +Z axis toward +X, then rotate around Y axis
+	var angle := atan2(direction.x, direction.y)
+	arrow.rotation = Vector3(PI/2, angle, 0)
+
+	# Scale to maintain constant visual size regardless of zoom
+	var scale_factor := ortho_size / BASE_ORTHO_SIZE * 3.0
+	arrow.scale = Vector3.ONE * scale_factor
 
 	# Set color by type
 	var color: Color = MARKER_COLORS.get(marker_type, MARKER_COLORS["default"])
@@ -234,9 +191,9 @@ func _check_marker(marker_data: Dictionary, player_pos: Vector3, ortho_size: flo
 	arrow.visible = true
 
 func _update_waypoint(player_pos: Vector3, ortho_size: float) -> void:
-	# Use getter methods for web compatibility (direct property access crashes on web)
-	var active_waypoint_id := minimap.get_active_waypoint_id()
-	var waypoints := minimap.get_waypoints()
+	# Use getter methods for compatibility
+	var active_waypoint_id: int = minimap.get_active_waypoint_id()
+	var waypoints: Dictionary = minimap.get_waypoints()
 
 	if active_waypoint_id == -1 or active_waypoint_id not in waypoints:
 		_waypoint_arrow.visible = false
@@ -257,7 +214,7 @@ func _update_waypoint(player_pos: Vector3, ortho_size: float) -> void:
 		_waypoint_arrow.visible = false
 		return
 
-	# Position arrow near center based on edge_arrow_inset
+	# Position arrow based on edge_arrow_inset
 	var direction := flat_offset.normalized()
 	var inset: float = minimap.edge_arrow_inset
 	var arrow_distance: float = ortho_size / 2.0 * (1.0 - inset)
@@ -268,6 +225,14 @@ func _update_waypoint(player_pos: Vector3, ortho_size: float) -> void:
 		player_pos.y + ARROW_HEIGHT,
 		player_pos.z + edge_offset.y
 	)
+
+	# Rotate to point toward waypoint (for consistency with marker arrows)
+	var angle := atan2(direction.x, direction.y)
+	_waypoint_arrow.rotation = Vector3(PI/2, angle, 0)
+
+	# Scale to maintain constant visual size regardless of zoom
+	var scale_factor := ortho_size / BASE_ORTHO_SIZE * 3.0
+	_waypoint_arrow.scale = Vector3.ONE * scale_factor
 
 	_waypoint_material.albedo_color = wp_color
 	_waypoint_arrow.visible = true

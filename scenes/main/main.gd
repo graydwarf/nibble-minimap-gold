@@ -79,10 +79,10 @@ func _spawn_single_collectible(color: Color) -> void:
 	var collectible: Area3D = CollectibleScene.instantiate()
 	collectible.pellet_color = color
 
-	# Spawn collectibles close to player for easy testing
+	# Spawn collectibles spread around the map
 	var spawn_pos := _get_terrain_pos(
-		randf_range(-8.0, 8.0),
-		randf_range(-8.0, 8.0)
+		randf_range(-SPAWN_RANGE, SPAWN_RANGE),
+		randf_range(-SPAWN_RANGE, SPAWN_RANGE)
 	)
 
 	add_child(collectible)
@@ -111,10 +111,10 @@ func _on_collectible_collected(collectible: Node3D) -> void:
 	get_tree().create_timer(3.0).timeout.connect(func(): _spawn_single_collectible(color))
 
 func _spawn_waypoints() -> void:
-	# Demo waypoints - close to player for testing
-	minimap.add_waypoint(_get_terrain_pos(10, -8), "Cave Entrance", Color(0.8, 0.5, 1.0))
-	minimap.add_waypoint(_get_terrain_pos(-8, 6), "Village", Color(0.3, 0.9, 0.5))
-	minimap.add_waypoint(_get_terrain_pos(6, 10), "Tower", Color(1.0, 0.8, 0.3))
+	# Demo waypoints spread around the map
+	minimap.add_waypoint(_get_terrain_pos(35, -30), "Cave Entrance", Color(0.8, 0.5, 1.0))
+	minimap.add_waypoint(_get_terrain_pos(-30, 25), "Village", Color(0.3, 0.9, 0.5))
+	minimap.add_waypoint(_get_terrain_pos(25, 35), "Tower", Color(1.0, 0.8, 0.3))
 
 # Returns position with terrain height
 func _get_terrain_pos(x: float, z: float) -> Vector3:
@@ -124,12 +124,11 @@ func _get_terrain_pos(x: float, z: float) -> Vector3:
 	return pos
 
 func _spawn_wanderers() -> void:
-	# Spawn several roaming NPCs with tracked markers
-	# Spawn wanderers close to player for easy testing
+	# Spawn several roaming NPCs with tracked markers spread around the map
 	var spawn_configs := [
-		{"pos": Vector2(5, 6), "color": Color(0.9, 0.2, 0.2), "name": "Goblin"},
-		{"pos": Vector2(-6, 4), "color": Color(0.9, 0.4, 0.1), "name": "Orc"},
-		{"pos": Vector2(4, -5), "color": Color(0.7, 0.2, 0.7), "name": "Wraith"},
+		{"pos": Vector2(20, 25), "color": Color(0.9, 0.2, 0.2), "name": "Goblin"},
+		{"pos": Vector2(-25, 15), "color": Color(0.9, 0.4, 0.1), "name": "Orc"},
+		{"pos": Vector2(15, -20), "color": Color(0.7, 0.2, 0.7), "name": "Wraith"},
 	]
 
 	for config in spawn_configs:

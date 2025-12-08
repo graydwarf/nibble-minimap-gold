@@ -52,5 +52,5 @@ func _update_positions() -> void:
 		_labels["S"].visible = show_all_directions
 
 	if "W" in _labels:
-		_labels["W"].position = center + Vector2(-radius - label_offset * 2, -label_offset)
+		_labels["W"].position = center + Vector2(-radius - label_offset * 2 + 8, -label_offset)
 		_labels["W"].visible = show_all_directions

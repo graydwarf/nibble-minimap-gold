@@ -70,17 +70,27 @@ func _sync_from_minimap() -> void:
 	# View mode
 	view_option.selected = minimap.map_view
 
-	# Opacity
-	opacity_slider.value = minimap.opacity
-	opacity_label.text = "%d%%" % int(minimap.opacity * 100)
+	# Opacity - use getter for web compatibility (properties not always accessible on web)
+	var opacity_value: float = 0.85  # Default fallback
+	if minimap.has_method("get_opacity"):
+		opacity_value = minimap.get_opacity()
+	else:
+		opacity_value = minimap.opacity
+	opacity_slider.value = opacity_value
+	opacity_label.text = "%d%%" % int(opacity_value * 100)
 
 	# Cardinals
 	cardinals_check.button_pressed = minimap.show_cardinal_directions
 
-	# Marker visibility
+	# Marker visibility - use getter for web compatibility
 	resource_check.button_pressed = minimap.show_resource_markers
-	distance_slider.value = minimap.marker_view_distance
-	distance_label.text = "%dm" % int(minimap.marker_view_distance)
+	var view_dist: float = 40.0  # Default fallback
+	if minimap.has_method("get_marker_view_distance"):
+		view_dist = minimap.get_marker_view_distance()
+	else:
+		view_dist = minimap.marker_view_distance
+	distance_slider.value = view_dist
+	distance_label.text = "%dm" % int(view_dist)
 
 func _on_size_changed(value: float) -> void:
 	if minimap:
@@ -102,12 +112,14 @@ func _on_view_changed(index: int) -> void:
 
 func _on_opacity_changed(value: float) -> void:
 	if minimap:
+		print("[CONFIG] Opacity changed to %s" % value)
 		# Use public method to ensure web compatibility
 		if minimap.has_method("set_opacity"):
 			minimap.set_opacity(value)
 		else:
 			minimap.opacity = value
 		opacity_label.text = "%d%%" % int(value * 100)
+		print("[CONFIG] Minimap opacity now=%s, modulate.a=%s" % [minimap.opacity, minimap.modulate.a])
 
 func _on_cardinals_toggled(pressed: bool) -> void:
 	if minimap:
@@ -125,13 +137,31 @@ func _on_resource_toggled(pressed: bool) -> void:
 
 func _on_distance_changed(value: float) -> void:
 	if minimap:
-		minimap.marker_view_distance = value
+		print("[CONFIG] View distance changed to %s" % value)
+		# Use setter method for web compatibility
+		if minimap.has_method("set_marker_view_distance"):
+			minimap.set_marker_view_distance(value)
+		else:
+			minimap.marker_view_distance = value
 		distance_label.text = "%dm" % int(value)
-		# Update existing tracked markers (loot and enemy)
-		for marker_id in minimap._tracked_markers:
-			var data: Dictionary = minimap._tracked_markers[marker_id]
+		# Update existing tracked markers (loot and enemy) - use getter for web compatibility
+		var tracked: Dictionary = {}
+		if minimap.has_method("get_tracked_markers"):
+			tracked = minimap.get_tracked_markers()
+		else:
+			tracked = minimap._tracked_markers
+		for marker_id in tracked:
+			var data: Dictionary = tracked[marker_id]
 			if data.type in ["loot", "enemy"] and data.node:
-				data.node.visibility_distance = value
+				if data.node.has_method("set_visibility_distance"):
+					data.node.set_visibility_distance(value)
+				else:
+					data.node.visibility_distance = value
+		# Use getter for logging
+		var actual_dist: float = 0.0
+		if minimap.has_method("get_marker_view_distance"):
+			actual_dist = minimap.get_marker_view_distance()
+		print("[CONFIG] Updated marker_view_distance=%s" % actual_dist)
 
 func _on_close_pressed() -> void:
 	hide()

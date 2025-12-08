@@ -50,5 +50,3 @@ sprint={
 }
 
 [autoload]
-
-DebugConsole="*res://scripts/debug_console.gd"
