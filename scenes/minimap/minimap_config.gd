@@ -15,6 +15,9 @@ var minimap: Control = null
 @onready var opacity_slider: HSlider = $MarginContainer/VBoxContainer/OpacityRow/OpacitySlider
 @onready var opacity_label: Label = $MarginContainer/VBoxContainer/OpacityRow/OpacityValue
 @onready var cardinals_check: CheckBox = $MarginContainer/VBoxContainer/CardinalsRow/CardinalsCheck
+@onready var resource_check: CheckBox = $MarginContainer/VBoxContainer/ResourceRow/ResourceCheck
+@onready var distance_slider: HSlider = $MarginContainer/VBoxContainer/DistanceRow/DistanceSlider
+@onready var distance_label: Label = $MarginContainer/VBoxContainer/DistanceRow/DistanceValue
 @onready var close_button: Button = $MarginContainer/VBoxContainer/CloseButton
 
 func _ready() -> void:
@@ -39,6 +42,8 @@ func _ready() -> void:
 	view_option.item_selected.connect(_on_view_changed)
 	opacity_slider.value_changed.connect(_on_opacity_changed)
 	cardinals_check.toggled.connect(_on_cardinals_toggled)
+	resource_check.toggled.connect(_on_resource_toggled)
+	distance_slider.value_changed.connect(_on_distance_changed)
 	close_button.pressed.connect(_on_close_pressed)
 
 func setup(minimap_ref: Control) -> void:
@@ -72,6 +77,11 @@ func _sync_from_minimap() -> void:
 	# Cardinals
 	cardinals_check.button_pressed = minimap.show_cardinal_directions
 
+	# Marker visibility
+	resource_check.button_pressed = minimap.show_resource_markers
+	distance_slider.value = minimap.marker_view_distance
+	distance_label.text = "%dm" % int(minimap.marker_view_distance)
+
 func _on_size_changed(value: float) -> void:
 	if minimap:
 		minimap.map_size = Vector2i(int(value), int(value))
@@ -92,14 +102,36 @@ func _on_view_changed(index: int) -> void:
 
 func _on_opacity_changed(value: float) -> void:
 	if minimap:
-		minimap.opacity = value
+		# Use public method to ensure web compatibility
+		if minimap.has_method("set_opacity"):
+			minimap.set_opacity(value)
+		else:
+			minimap.opacity = value
 		opacity_label.text = "%d%%" % int(value * 100)
 
 func _on_cardinals_toggled(pressed: bool) -> void:
 	if minimap:
-		minimap.show_cardinal_directions = pressed
-		if minimap.cardinal_indicator:
-			minimap.cardinal_indicator.visible = pressed
+		# Use public method to ensure proper visibility handling
+		if minimap.has_method("set_cardinals_visible"):
+			minimap.set_cardinals_visible(pressed)
+		else:
+			minimap.show_cardinal_directions = pressed
+			if minimap.cardinal_indicator:
+				minimap.cardinal_indicator.visible = pressed
+
+func _on_resource_toggled(pressed: bool) -> void:
+	if minimap:
+		minimap.show_resource_markers = pressed
+
+func _on_distance_changed(value: float) -> void:
+	if minimap:
+		minimap.marker_view_distance = value
+		distance_label.text = "%dm" % int(value)
+		# Update existing tracked markers (loot and enemy)
+		for marker_id in minimap._tracked_markers:
+			var data: Dictionary = minimap._tracked_markers[marker_id]
+			if data.type in ["loot", "enemy"] and data.node:
+				data.node.visibility_distance = value
 
 func _on_close_pressed() -> void:
 	hide()

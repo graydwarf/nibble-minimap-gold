@@ -69,25 +69,20 @@ func _on_camera_mode_changed(mode_name: String) -> void:
 	hint_label.text = "WASD: Move | V: %s | Tab: Waypoint | M: Settings | Scroll: Zoom" % mode_name
 
 func _spawn_collectibles() -> void:
-	# Spawn collectible pellets spread around the terrain
-	var colors := [
-		Color(0.3, 0.7, 1.0),   # Blue
-		Color(0.3, 1.0, 0.5),   # Green
-		Color(1.0, 0.8, 0.2),   # Gold
-		Color(1.0, 0.4, 0.4),   # Red
-	]
+	# Spawn collectible pellets spread around the terrain (all yellow to match arrows)
+	var yellow := Color(1.0, 1.0, 0.0)  # Bright yellow
 
 	for i in NUM_COLLECTIBLES:
-		_spawn_single_collectible(colors[i % colors.size()])
+		_spawn_single_collectible(yellow)
 
 func _spawn_single_collectible(color: Color) -> void:
 	var collectible: Area3D = CollectibleScene.instantiate()
 	collectible.pellet_color = color
 
-	# Random position within spawn range
+	# Spawn collectibles close to player for easy testing
 	var spawn_pos := _get_terrain_pos(
-		randf_range(-SPAWN_RANGE, SPAWN_RANGE),
-		randf_range(-SPAWN_RANGE, SPAWN_RANGE)
+		randf_range(-8.0, 8.0),
+		randf_range(-8.0, 8.0)
 	)
 
 	add_child(collectible)
@@ -116,10 +111,10 @@ func _on_collectible_collected(collectible: Node3D) -> void:
 	get_tree().create_timer(3.0).timeout.connect(func(): _spawn_single_collectible(color))
 
 func _spawn_waypoints() -> void:
-	# Demo waypoints - pinnable objectives with distance tracking
-	minimap.add_waypoint(_get_terrain_pos(40, -30), "Cave Entrance", Color(0.8, 0.5, 1.0))
-	minimap.add_waypoint(_get_terrain_pos(-35, 25), "Village", Color(0.3, 0.9, 0.5))
-	minimap.add_waypoint(_get_terrain_pos(25, 40), "Tower", Color(1.0, 0.8, 0.3))
+	# Demo waypoints - close to player for testing
+	minimap.add_waypoint(_get_terrain_pos(10, -8), "Cave Entrance", Color(0.8, 0.5, 1.0))
+	minimap.add_waypoint(_get_terrain_pos(-8, 6), "Village", Color(0.3, 0.9, 0.5))
+	minimap.add_waypoint(_get_terrain_pos(6, 10), "Tower", Color(1.0, 0.8, 0.3))
 
 # Returns position with terrain height
 func _get_terrain_pos(x: float, z: float) -> Vector3:
@@ -130,10 +125,11 @@ func _get_terrain_pos(x: float, z: float) -> Vector3:
 
 func _spawn_wanderers() -> void:
 	# Spawn several roaming NPCs with tracked markers
+	# Spawn wanderers close to player for easy testing
 	var spawn_configs := [
-		{"pos": Vector2(20, 20), "color": Color(0.9, 0.2, 0.2), "name": "Goblin"},
-		{"pos": Vector2(-25, 15), "color": Color(0.9, 0.4, 0.1), "name": "Orc"},
-		{"pos": Vector2(10, -30), "color": Color(0.7, 0.2, 0.7), "name": "Wraith"},
+		{"pos": Vector2(5, 6), "color": Color(0.9, 0.2, 0.2), "name": "Goblin"},
+		{"pos": Vector2(-6, 4), "color": Color(0.9, 0.4, 0.1), "name": "Orc"},
+		{"pos": Vector2(4, -5), "color": Color(0.7, 0.2, 0.7), "name": "Wraith"},
 	]
 
 	for config in spawn_configs:

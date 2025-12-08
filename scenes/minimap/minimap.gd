@@ -64,11 +64,11 @@ enum MapView { TOP_DOWN, ANGLED_25D, PERSPECTIVE_3D }
 @export var minimap_theme: Resource = null  # MinimapTheme resource
 
 @export_group("Edge Arrows")
-@export_range(0.0, 0.8) var edge_arrow_inset: float = 0.0  # 0.0 = edges, 0.5 = halfway to center
+@export_range(0.0, 0.99) var edge_arrow_inset: float = 0.95  # 0.0 = edges, 1.0 = center (testing)
 
-@export_group("Resource Markers")
+@export_group("Marker Visibility")
 @export var show_resource_markers: bool = true
-@export_range(0.0, 100.0) var resource_marker_distance: float = 20.0  # 0 = always visible
+@export_range(0.0, 100.0) var marker_view_distance: float = 40.0  # 0 = always visible, affects loot and enemy markers
 
 @export_group("Compass Bar")
 @export var compass_bar_enabled: bool = false
@@ -116,11 +116,34 @@ var _diamond_texture: Texture2D = null
 
 var player_marker: Control = null
 var cardinal_indicator: Control = null
-var edge_arrows: Control = null
+var edge_arrows: Control = null  # 2D fallback (native)
+var edge_arrows_3d: Node3D = null  # 3D arrows (web compatible)
 var trail_renderer: Node3D = null
 var compass_bar: Control = null
 
 var _is_web: bool = false
+
+# ============ INTEGRATED EDGE ARROWS (web compatible) ============
+# Edge arrows are integrated directly into minimap.gd to avoid web export issues
+# with dynamically instantiated scripts not being able to set properties
+const EDGE_ARROW_LAYER := 20
+const MAX_EDGE_ARROWS := 20
+const EDGE_ARROW_HEIGHT := 10.0
+
+var _edge_arrow_pool: Array[MeshInstance3D] = []
+var _edge_arrow_materials: Array[StandardMaterial3D] = []
+var _edge_arrow_index: int = 0
+var _waypoint_arrow: MeshInstance3D = null
+var _waypoint_material: StandardMaterial3D = null
+
+const EDGE_ARROW_COLORS := {
+	"default": Color(1.0, 1.0, 0.0),
+	"enemy": Color(1.0, 0.3, 0.3),
+	"friendly": Color(0.3, 1.0, 0.3),
+	"loot": Color(1.0, 1.0, 0.0),
+	"objective": Color(1.0, 0.9, 0.2),
+}
+var _waypoint_arrow_color: Color = Color(0.8, 0.5, 1.0)
 
 func _ready() -> void:
 	# Detect web platform - shaders don't work reliably on web
@@ -149,6 +172,7 @@ func _process(_delta: float) -> void:
 		_update_distance_label()
 		_update_tracked_markers()
 		_update_trail()
+		_update_integrated_edge_arrows()
 
 func _input(event: InputEvent) -> void:
 	if not zoom_enabled:
@@ -186,6 +210,18 @@ func set_player(player_node: Node3D) -> void:
 		if not _world_root:
 			_world_root = get_tree().root.get_child(0) as Node3D
 
+		# CRITICAL: Connect SubViewport to main scene's World3D
+		# Without this, the minimap camera can't see objects in the main scene
+		var main_world_3d := player.get_world_3d()
+		if sub_viewport and main_world_3d:
+			sub_viewport.world_3d = main_world_3d
+
+		# Create 3D edge arrows now that we have world root (native only)
+		_create_edge_arrows_3d()
+		# Update existing edge_arrows_3d with player reference (native only)
+		if edge_arrows_3d:
+			edge_arrows_3d.player = player
+
 # Adds a POI marker at the given world position. Returns marker ID.
 # Optional priority parameter overrides default type priority (higher = renders on top)
 func add_marker(world_position: Vector3, marker_type: String = "default", _label: String = "", priority: int = 0) -> int:
@@ -214,6 +250,10 @@ func add_marker(world_position: Vector3, marker_type: String = "default", _label
 	# Set player reference for elevation indicators
 	if player and marker_node.has_method("set_player_reference"):
 		marker_node.set_player_reference(player)
+
+	# Call setup() to create visuals now that properties are set
+	if marker_node.has_method("setup"):
+		marker_node.setup()
 
 	_markers[marker_id] = {
 		"node": marker_node,
@@ -280,9 +320,9 @@ func add_tracked_marker(target: Node3D, marker_type: String = "enemy", _label: S
 	if priority > 0:
 		marker_node.marker_priority = priority
 
-	# Apply resource marker distance for loot type
-	if marker_type == "loot":
-		marker_node.visibility_distance = resource_marker_distance
+	# Apply view distance for loot and enemy markers
+	if marker_type in ["loot", "enemy"]:
+		marker_node.visibility_distance = marker_view_distance
 
 	_world_root.add_child(marker_node)
 	marker_node.global_position = target.global_position
@@ -290,6 +330,10 @@ func add_tracked_marker(target: Node3D, marker_type: String = "enemy", _label: S
 	# Set player reference for elevation indicators and proximity visibility
 	if player and marker_node.has_method("set_player_reference"):
 		marker_node.set_player_reference(player)
+
+	# Call setup() to create visuals now that properties are set
+	if marker_node.has_method("setup"):
+		marker_node.setup()
 
 	_tracked_markers[marker_id] = {
 		"node": marker_node,
@@ -444,6 +488,24 @@ func get_active_waypoint_label() -> String:
 
 # ============ END WAYPOINT SYSTEM ============
 
+# ============ GETTERS FOR WEB COMPATIBILITY ============
+# Direct private property access crashes on web with dynamically instantiated scripts.
+# These getters provide safe access for external scripts like edge_arrows_3d.gd.
+
+func get_markers() -> Dictionary:
+	return _markers
+
+func get_tracked_markers() -> Dictionary:
+	return _tracked_markers
+
+func get_waypoints() -> Dictionary:
+	return _waypoints
+
+func get_active_waypoint_id() -> int:
+	return _active_waypoint_id
+
+# ============ END GETTERS ============
+
 # Sets the camera view mode at runtime
 func set_view_mode(mode: MapView) -> void:
 	map_view = mode
@@ -503,9 +565,6 @@ func _create_player_marker() -> void:
 	player_marker.move_to_front()
 
 func _create_cardinal_indicator() -> void:
-	if not show_cardinal_directions:
-		return
-
 	cardinal_indicator = Control.new()
 	cardinal_indicator.name = "CardinalIndicator"
 	cardinal_indicator.set_script(preload("res://scenes/minimap/cardinal_indicator.gd"))
@@ -520,26 +579,43 @@ func _create_cardinal_indicator() -> void:
 	add_child(cardinal_indicator)
 	cardinal_indicator.move_to_front()
 
+	# Set visibility based on setting
+	cardinal_indicator.visible = show_cardinal_directions
+
 func _create_edge_arrows() -> void:
-	edge_arrows = Control.new()
-	edge_arrows.name = "EdgeArrows"
-	edge_arrows.set_script(preload("res://scenes/minimap/edge_arrows.gd"))
-	edge_arrows.minimap = self
-	edge_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Use 3D arrows (works on web and native)
+	# They render on the minimap layer and are positioned in world space
+	if _world_root:
+		_create_edge_arrows_3d()
 
-	# On web, use 0.5 inset for testing (brings arrows halfway to center)
-	if _is_web and edge_arrow_inset == 0.0:
-		edge_arrows.edge_inset = 0.5
-	else:
+	# Also create 2D arrows for native (faster, but doesn't work on web)
+	if not _is_web:
+		edge_arrows = Control.new()
+		edge_arrows.name = "EdgeArrows"
+		edge_arrows.set_script(preload("res://scenes/minimap/edge_arrows.gd"))
+		edge_arrows.minimap = self
+		edge_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		edge_arrows.edge_inset = edge_arrow_inset
+		edge_arrows.position = Vector2.ZERO
+		edge_arrows.size = Vector2(map_size)
+		add_child(edge_arrows)
+		edge_arrows.move_to_front()
 
-	# Set explicit size (web compatibility - anchors may not work)
-	edge_arrows.position = Vector2.ZERO
-	edge_arrows.size = Vector2(map_size)
+func _create_edge_arrows_3d() -> void:
+	# Web uses integrated edge arrows in minimap.gd directly
+	# because dynamically instantiated scripts can't have properties set on web
+	if _is_web:
+		DebugConsole.log("[Minimap] _create_edge_arrows_3d() SKIPPED (using integrated edge arrows for web)")
+		return
 
-	# Add to self (Minimap) instead of viewport_container to avoid shader issues on web
-	add_child(edge_arrows)
-	edge_arrows.move_to_front()
+	if edge_arrows_3d or not _world_root:
+		return
+
+	# Native only: use separate edge_arrows_3d script
+	var edge_arrows_scene := preload("res://scenes/minimap/edge_arrows_3d.tscn")
+	edge_arrows_3d = edge_arrows_scene.instantiate()
+	_world_root.add_child(edge_arrows_3d)
+	edge_arrows_3d.initialize(self, player)
 
 func _create_distance_label() -> void:
 	# Load icon textures (optional - falls back to Unicode if not imported)
@@ -733,11 +809,17 @@ func _update_opacity() -> void:
 		return
 
 	# On web, use modulate instead of shader (shader doesn't work on web)
+	# IMPORTANT: Only set modulate on the parent Minimap control, NOT on children
+	# Setting on multiple nodes causes multiplicative alpha (0.85 * 0.85 = 0.72)
 	if _is_web:
+		# Reset children to full opacity to avoid multiplication
 		if viewport_container:
-			viewport_container.modulate.a = opacity
+			viewport_container.modulate.a = 1.0
+			viewport_container.self_modulate.a = 1.0
 		if shadow:
-			shadow.modulate.a = opacity
+			shadow.self_modulate.a = 1.0
+		# Set opacity only on parent control
+		modulate.a = opacity
 		return
 
 	# On native, use shader opacity for the terrain/viewport
@@ -746,6 +828,17 @@ func _update_opacity() -> void:
 	# Also apply to shadow
 	if shadow:
 		shadow.modulate.a = opacity
+
+# Public method for config dialog to call
+func set_opacity(value: float) -> void:
+	opacity = value
+	_update_opacity()
+
+# Public method for config dialog to toggle cardinals
+func set_cardinals_visible(visible_flag: bool) -> void:
+	show_cardinal_directions = visible_flag
+	if cardinal_indicator:
+		cardinal_indicator.visible = visible_flag
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
@@ -891,3 +984,189 @@ func set_compass_bar_enabled(enabled: bool) -> void:
 		compass_bar.visible = enabled
 	elif enabled:
 		_create_compass_bar()
+
+# ============ INTEGRATED EDGE ARROWS (web compatible) ============
+
+func _setup_integrated_edge_arrows() -> void:
+	if _edge_arrow_pool.size() > 0:
+		return  # Already setup
+
+	DebugConsole.log("[Minimap] _setup_integrated_edge_arrows()")
+
+	var cone_mesh := _create_edge_cone_mesh()
+
+	for i in MAX_EDGE_ARROWS:
+		var arrow := MeshInstance3D.new()
+		arrow.mesh = cone_mesh
+		arrow.layers = 1 << (EDGE_ARROW_LAYER - 1)
+		arrow.visible = false
+
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color.YELLOW
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		arrow.material_override = mat
+
+		_world_root.add_child(arrow)
+		_edge_arrow_pool.append(arrow)
+		_edge_arrow_materials.append(mat)
+
+	# Create waypoint arrow (diamond shape)
+	_waypoint_arrow = MeshInstance3D.new()
+	_waypoint_arrow.mesh = _create_edge_diamond_mesh()
+	_waypoint_arrow.layers = 1 << (EDGE_ARROW_LAYER - 1)
+	_waypoint_arrow.visible = false
+
+	_waypoint_material = StandardMaterial3D.new()
+	_waypoint_material.albedo_color = _waypoint_arrow_color
+	_waypoint_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_waypoint_arrow.material_override = _waypoint_material
+	_world_root.add_child(_waypoint_arrow)
+
+	DebugConsole.log("[Minimap] edge arrows created: %d arrows + 1 waypoint" % MAX_EDGE_ARROWS)
+
+func _create_edge_cone_mesh() -> CylinderMesh:
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = 1.5
+	cone.height = 3.0
+	cone.radial_segments = 8
+	return cone
+
+func _create_edge_diamond_mesh() -> ArrayMesh:
+	var top := CylinderMesh.new()
+	top.top_radius = 0.0
+	top.bottom_radius = 1.5
+	top.height = 2.0
+	top.radial_segments = 4
+
+	var bottom := CylinderMesh.new()
+	bottom.top_radius = 1.5
+	bottom.bottom_radius = 0.0
+	bottom.height = 2.0
+	bottom.radial_segments = 4
+
+	var combined := ArrayMesh.new()
+	var st := SurfaceTool.new()
+
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(top, 0, Transform3D().translated(Vector3(0, 1.0, 0)))
+	st.commit(combined)
+
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(bottom, 0, Transform3D().translated(Vector3(0, -1.0, 0)))
+	st.commit(combined)
+
+	return combined
+
+func _update_integrated_edge_arrows() -> void:
+	# Setup arrows if not done yet
+	if _edge_arrow_pool.size() == 0 and _world_root:
+		_setup_integrated_edge_arrows()
+
+	if _edge_arrow_pool.size() == 0:
+		return
+
+	_edge_arrow_index = 0
+
+	var player_pos := player.global_position
+	var ortho_size: float = camera_ortho_size
+
+	# Check static markers
+	for marker_id in _markers:
+		if _edge_arrow_index >= MAX_EDGE_ARROWS:
+			break
+		_check_edge_marker(_markers[marker_id], player_pos, ortho_size)
+
+	# Check tracked markers
+	for marker_id in _tracked_markers:
+		if _edge_arrow_index >= MAX_EDGE_ARROWS:
+			break
+		_check_edge_marker(_tracked_markers[marker_id], player_pos, ortho_size)
+
+	# Hide unused arrows
+	for i in range(_edge_arrow_index, MAX_EDGE_ARROWS):
+		_edge_arrow_pool[i].visible = false
+
+	# Update waypoint
+	_update_edge_waypoint(player_pos, ortho_size)
+
+func _check_edge_marker(marker_data: Dictionary, player_pos: Vector3, ortho_size: float) -> void:
+	var marker_node: Node3D = marker_data.node
+	if not marker_node:
+		return
+
+	var marker_type: String = marker_data.get("type", "default")
+
+	# Check loot visibility settings
+	if marker_type == "loot":
+		if not show_resource_markers:
+			return
+		if marker_node.get("_is_visible_by_distance") == false:
+			return
+
+	var marker_pos := marker_node.global_position
+	var offset := marker_pos - player_pos
+	var flat_offset := Vector2(offset.x, offset.z)
+	var distance := flat_offset.length()
+
+	# Only show arrow if marker is outside visible area
+	var visible_radius := ortho_size / 2.0 * 0.9
+	if distance <= visible_radius:
+		return
+
+	var direction := flat_offset.normalized()
+	var inset: float = edge_arrow_inset
+	var arrow_distance: float = ortho_size / 2.0 * (1.0 - inset)
+	var edge_offset := direction * arrow_distance
+
+	var arrow := _edge_arrow_pool[_edge_arrow_index]
+	var mat := _edge_arrow_materials[_edge_arrow_index]
+	_edge_arrow_index += 1
+
+	arrow.global_position = Vector3(
+		player_pos.x + edge_offset.x,
+		player_pos.y + EDGE_ARROW_HEIGHT,
+		player_pos.z + edge_offset.y
+	)
+
+	var angle := atan2(direction.y, direction.x)
+	arrow.rotation = Vector3(PI/2, 0, -angle + PI/2)
+
+	var color: Color = EDGE_ARROW_COLORS.get(marker_type, EDGE_ARROW_COLORS["default"])
+	mat.albedo_color = color
+	arrow.visible = true
+
+func _update_edge_waypoint(player_pos: Vector3, ortho_size: float) -> void:
+	if not _waypoint_arrow:
+		return
+
+	if _active_waypoint_id == -1 or _active_waypoint_id not in _waypoints:
+		_waypoint_arrow.visible = false
+		return
+
+	var waypoint_data: Dictionary = _waypoints[_active_waypoint_id]
+	var waypoint_pos: Vector3 = waypoint_data.position
+	var wp_color: Color = waypoint_data.get("color", _waypoint_arrow_color)
+
+	var offset := waypoint_pos - player_pos
+	var flat_offset := Vector2(offset.x, offset.z)
+	var distance := flat_offset.length()
+
+	var visible_radius := ortho_size / 2.0 * 0.9
+	if distance <= visible_radius:
+		_waypoint_arrow.visible = false
+		return
+
+	var direction := flat_offset.normalized()
+	var inset: float = edge_arrow_inset
+	var arrow_distance: float = ortho_size / 2.0 * (1.0 - inset)
+	var edge_offset := direction * arrow_distance
+
+	_waypoint_arrow.global_position = Vector3(
+		player_pos.x + edge_offset.x,
+		player_pos.y + EDGE_ARROW_HEIGHT,
+		player_pos.z + edge_offset.y
+	)
+
+	_waypoint_material.albedo_color = wp_color
+	_waypoint_arrow.visible = true

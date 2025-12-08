@@ -1,111 +1,130 @@
 extends Control
-## Shows arrows at minimap edges pointing to off-screen POI markers and waypoints.
-## Uses TextureRect nodes for web compatibility (Control-based, not Node2D).
+## Shows triangular arrows at minimap edges pointing to off-screen markers.
+## Uses custom _draw() for triangle rendering.
 
 var minimap: Control = null
-var arrow_color: Color = Color(1.0, 1.0, 0.0)  # Yellow
-var waypoint_color: Color = Color(0.8, 0.5, 1.0)  # Purple
 var edge_padding: float = 12.0  # Distance from edge
-var edge_inset: float = 0.0  # 0.0 = edges, 0.5 = halfway to center (for web testing)
+var edge_inset: float = 0.95  # 0.0 = at edges, 1.0 = at center (player arrow)
 
-# Pool of arrow TextureRects for reuse
-var _arrow_pool: Array[TextureRect] = []
-var _arrow_pool_index: int = 0
-var _waypoint_rect: TextureRect = null
+# Color scheme by marker type
+const MARKER_COLORS := {
+	"default": Color(1.0, 1.0, 0.0),   # Yellow
+	"enemy": Color(1.0, 0.3, 0.3),     # Red
+	"friendly": Color(0.3, 1.0, 0.3),  # Green
+	"loot": Color(1.0, 1.0, 0.0),      # Yellow (matches pellets)
+	"objective": Color(1.0, 0.9, 0.2), # Yellow
+}
+var waypoint_color: Color = Color(0.8, 0.5, 1.0)  # Purple
 
-var _arrow_texture: Texture2D = null
-var _diamond_texture: Texture2D = null
+# Arrow data for drawing
+var _arrows_to_draw: Array[Dictionary] = []  # {position, angle, color}
+var _waypoint_to_draw: Dictionary = {}  # {position, color, visible}
 
-const MAX_ARROWS := 20  # Max simultaneous edge arrows
-const ARROW_SIZE := Vector2(16, 16)
-const DIAMOND_SIZE := Vector2(16, 16)
-
-func _ready() -> void:
-	# Load textures
-	if ResourceLoader.exists("res://assets/icons/edge_arrow.svg"):
-		_arrow_texture = load("res://assets/icons/edge_arrow.svg")
-	if ResourceLoader.exists("res://assets/icons/edge_diamond.svg"):
-		_diamond_texture = load("res://assets/icons/edge_diamond.svg")
-
-	# Pre-create arrow pool using TextureRect (Control-based for web)
-	for i in MAX_ARROWS:
-		var arrow := TextureRect.new()
-		arrow.texture = _arrow_texture
-		arrow.custom_minimum_size = ARROW_SIZE
-		arrow.size = ARROW_SIZE
-		arrow.pivot_offset = ARROW_SIZE / 2  # Rotate around center
-		arrow.visible = false
-		add_child(arrow)
-		_arrow_pool.append(arrow)
-
-	# Create waypoint diamond TextureRect
-	_waypoint_rect = TextureRect.new()
-	_waypoint_rect.texture = _diamond_texture
-	_waypoint_rect.custom_minimum_size = DIAMOND_SIZE
-	_waypoint_rect.size = DIAMOND_SIZE
-	_waypoint_rect.visible = false
-	add_child(_waypoint_rect)
+const MAX_ARROWS := 20
+const ARROW_SIZE := 10.0  # Triangle size
 
 func _process(_delta: float) -> void:
 	_update_arrows()
+	queue_redraw()
+
+func _draw() -> void:
+	# Draw all arrows as triangles
+	for arrow_data in _arrows_to_draw:
+		_draw_triangle(arrow_data.position, arrow_data.angle, arrow_data.color)
+
+	# Draw waypoint diamond
+	if _waypoint_to_draw.get("visible", false):
+		_draw_diamond(_waypoint_to_draw.position, _waypoint_to_draw.color)
+
+func _draw_triangle(pos: Vector2, angle: float, color: Color) -> void:
+	# Triangle pointing right, rotated by angle
+	var points := PackedVector2Array()
+	var tip := Vector2(ARROW_SIZE, 0).rotated(angle)
+	var left := Vector2(-ARROW_SIZE * 0.6, -ARROW_SIZE * 0.5).rotated(angle)
+	var right := Vector2(-ARROW_SIZE * 0.6, ARROW_SIZE * 0.5).rotated(angle)
+
+	points.append(pos + tip)
+	points.append(pos + left)
+	points.append(pos + right)
+
+	draw_colored_polygon(points, color)
+
+func _draw_diamond(pos: Vector2, color: Color) -> void:
+	var s := ARROW_SIZE * 0.8
+	var points := PackedVector2Array()
+	points.append(pos + Vector2(0, -s))  # Top
+	points.append(pos + Vector2(s, 0))   # Right
+	points.append(pos + Vector2(0, s))   # Bottom
+	points.append(pos + Vector2(-s, 0))  # Left
+
+	draw_colored_polygon(points, color)
 
 func _update_arrows() -> void:
-	if not minimap or not minimap.player:
-		_hide_all()
-		return
+	_arrows_to_draw.clear()
+	_waypoint_to_draw = {"visible": false}
 
-	# Reset pool
-	_arrow_pool_index = 0
+	if not minimap or not minimap.player:
+		return
 
 	var map_center := size / 2.0
 	var player_pos: Vector3 = minimap.player.global_position
 	var scale_factor: float = size.x / minimap.camera_ortho_size
 
-	# Update POI arrows
+	# Update POI arrows (static markers)
 	for marker_id in minimap._markers:
-		if _arrow_pool_index >= MAX_ARROWS:
+		if _arrows_to_draw.size() >= MAX_ARROWS:
 			break
+		_check_marker_visibility(minimap._markers[marker_id], map_center, player_pos, scale_factor)
 
-		var marker_data: Dictionary = minimap._markers[marker_id]
-		var marker_node: Node3D = marker_data.node
-		if not marker_node:
-			continue
-
-		var world_pos := marker_node.global_position
-		var offset := world_pos - player_pos
-		var map_offset := Vector2(offset.x, offset.z) * scale_factor
-		var marker_screen_pos := map_center + map_offset
-
-		var marker_visible := (
-			marker_screen_pos.x >= 0 and
-			marker_screen_pos.x <= size.x and
-			marker_screen_pos.y >= 0 and
-			marker_screen_pos.y <= size.y
-		)
-
-		if not marker_visible:
-			_show_edge_arrow(map_center, marker_screen_pos)
-
-	# Hide unused arrows
-	for i in range(_arrow_pool_index, MAX_ARROWS):
-		_arrow_pool[i].visible = false
+	# Update tracked marker arrows (enemies, collectibles)
+	for marker_id in minimap._tracked_markers:
+		if _arrows_to_draw.size() >= MAX_ARROWS:
+			break
+		_check_marker_visibility(minimap._tracked_markers[marker_id], map_center, player_pos, scale_factor)
 
 	# Update waypoint diamond
 	_update_waypoint_indicator(map_center, player_pos, scale_factor)
 
-func _show_edge_arrow(center: Vector2, target: Vector2) -> void:
-	var arrow := _arrow_pool[_arrow_pool_index]
-	_arrow_pool_index += 1
+func _check_marker_visibility(marker_data: Dictionary, map_center: Vector2, player_pos: Vector3, scale_factor: float) -> void:
+	var marker_node: Node3D = marker_data.node
+	if not marker_node:
+		return
 
-	var direction := (target - center).normalized()
-	var edge_pos := _get_edge_intersection(center, direction)
-	var angle := direction.angle()
+	# Get marker type for coloring
+	var marker_type: String = marker_data.get("type", "default")
 
-	# TextureRect position is top-left corner, so offset by half size
-	arrow.position = edge_pos - ARROW_SIZE / 2
-	arrow.rotation = angle
-	arrow.modulate = arrow_color
-	arrow.visible = true
+	# Check if this is a loot marker and respect visibility settings
+	if marker_type == "loot":
+		# Check if resource markers are disabled
+		if not minimap.show_resource_markers:
+			return
+		# Check if the 3D marker is visible (respects proximity distance)
+		if marker_node.has_method("get") and not marker_node.get("_is_visible_by_distance"):
+			return
+
+	var world_pos := marker_node.global_position
+	var offset := world_pos - player_pos
+	var map_offset := Vector2(offset.x, offset.z) * scale_factor
+	var marker_screen_pos := map_center + map_offset
+
+	var marker_visible := (
+		marker_screen_pos.x >= 0 and
+		marker_screen_pos.x <= size.x and
+		marker_screen_pos.y >= 0 and
+		marker_screen_pos.y <= size.y
+	)
+
+	if not marker_visible:
+		var direction := (marker_screen_pos - map_center).normalized()
+		var edge_pos := _get_edge_intersection(map_center, direction)
+		var angle := direction.angle()
+		var color: Color = MARKER_COLORS.get(marker_type, MARKER_COLORS["default"])
+
+		_arrows_to_draw.append({
+			"position": edge_pos,
+			"angle": angle,
+			"color": color
+		})
 
 func _get_edge_intersection(center: Vector2, direction: Vector2) -> Vector2:
 	# Apply edge_inset: 0.0 = full size (edges), 0.5 = halfway to center
@@ -147,7 +166,7 @@ func _get_edge_intersection(center: Vector2, direction: Vector2) -> Vector2:
 
 func _update_waypoint_indicator(map_center: Vector2, player_pos: Vector3, scale_factor: float) -> void:
 	if minimap._active_waypoint_id == -1 or minimap._active_waypoint_id not in minimap._waypoints:
-		_waypoint_rect.visible = false
+		_waypoint_to_draw = {"visible": false}
 		return
 
 	var waypoint_data: Dictionary = minimap._waypoints[minimap._active_waypoint_id]
@@ -166,19 +185,14 @@ func _update_waypoint_indicator(map_center: Vector2, player_pos: Vector3, scale_
 	)
 
 	if waypoint_visible:
-		_waypoint_rect.visible = false
+		_waypoint_to_draw = {"visible": false}
 		return
 
 	var direction := (waypoint_screen_pos - map_center).normalized()
 	var edge_pos := _get_edge_intersection(map_center, direction)
 
-	# TextureRect position is top-left corner, so offset by half size
-	_waypoint_rect.position = edge_pos - DIAMOND_SIZE / 2
-	_waypoint_rect.modulate = wp_color
-	_waypoint_rect.visible = true
-
-func _hide_all() -> void:
-	for arrow in _arrow_pool:
-		arrow.visible = false
-	if _waypoint_rect:
-		_waypoint_rect.visible = false
+	_waypoint_to_draw = {
+		"position": edge_pos,
+		"color": wp_color,
+		"visible": true
+	}

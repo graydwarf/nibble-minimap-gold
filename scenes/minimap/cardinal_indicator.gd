@@ -35,21 +35,22 @@ func _create_labels() -> void:
 
 func _update_positions() -> void:
 	var center := size / 2
-	var radius := minf(size.x, size.y) / 2 - 16
+	var radius := minf(size.x, size.y) / 2 - 12
+	var label_offset := 6.0  # Half of approximate label size
 
-	# Position labels
+	# Position labels centered on their anchor points
 	if "N" in _labels:
-		_labels["N"].position = center + Vector2(-8, -radius + 8)
+		_labels["N"].position = center + Vector2(-label_offset, -radius - label_offset)
 		_labels["N"].visible = true
 
 	if "E" in _labels:
-		_labels["E"].position = center + Vector2(radius - 12, 0)
+		_labels["E"].position = center + Vector2(radius - label_offset, -label_offset)
 		_labels["E"].visible = show_all_directions
 
 	if "S" in _labels:
-		_labels["S"].position = center + Vector2(-6, radius - 4)
+		_labels["S"].position = center + Vector2(-label_offset, radius - label_offset * 2)
 		_labels["S"].visible = show_all_directions
 
 	if "W" in _labels:
-		_labels["W"].position = center + Vector2(-radius - 2, 0)
+		_labels["W"].position = center + Vector2(-radius - label_offset * 2, -label_offset)
 		_labels["W"].visible = show_all_directions

@@ -52,12 +52,22 @@ var elevation_threshold: float = 3.0  # Min height difference to show indicator
 var show_elevation_indicator: bool = true
 
 # Proximity visibility - markers only show when player is within this distance
-var visibility_distance: float = 25.0  # 0 = always visible, >0 = only show within distance
+var visibility_distance: float = 40.0  # 0 = always visible, >0 = only show within distance
 var _is_visible_by_distance: bool = false
+
+var _setup_complete: bool = false
 
 func _ready() -> void:
 	# Randomize starting phase so markers don't all bob in sync
 	_time = randf() * TAU
+	# Visual creation happens in setup() - called explicitly after properties are set
+
+# Call this after setting marker_type, marker_color, etc.
+func setup() -> void:
+	if _setup_complete:
+		return
+	_setup_complete = true
+	print("[POI] setup() called, type=", marker_type, " pos=", global_position)
 	_create_visual()
 
 func _process(delta: float) -> void:
@@ -166,8 +176,9 @@ func _create_visual() -> void:
 func _create_sphere_marker(size: float) -> void:
 	_marker_mesh = MeshInstance3D.new()
 	var sphere := SphereMesh.new()
-	sphere.radius = size / 2.0
-	sphere.height = size
+	# DEBUG: Make bigger for visibility testing
+	sphere.radius = size * 2.0
+	sphere.height = size * 4.0
 	sphere.radial_segments = 16
 	sphere.rings = 8
 	_marker_mesh.mesh = sphere
@@ -185,9 +196,9 @@ func _create_sphere_marker(size: float) -> void:
 func _create_star_marker() -> void:
 	_marker_mesh = MeshInstance3D.new()
 
-	# Use two cones to make a diamond shape (like waypoint but smaller)
-	var size := 0.8
-	var height := 1.2
+	# DEBUG: Make bigger for visibility testing
+	var size := 3.0
+	var height := 4.0
 
 	var top_cone := CylinderMesh.new()
 	top_cone.top_radius = 0.0
