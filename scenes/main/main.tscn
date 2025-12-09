@@ -58,7 +58,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
 
 [node name="Minimap" parent="CanvasLayer" instance=ExtResource("4_minimap")]
 unique_name_in_owner = true
-layout_mode = 3
 
 [node name="HintLabel" type="Label" parent="CanvasLayer"]
 anchors_preset = 2

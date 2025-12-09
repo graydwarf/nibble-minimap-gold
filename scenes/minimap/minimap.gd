@@ -2,6 +2,8 @@ extends Control
 ## Mini-map component that renders a top-down view of the world.
 ## Configurable size, position, corner placement, and camera view modes.
 
+const DEBUG_VERBOSE: bool = false
+
 enum ScreenCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CUSTOM }
 enum MapView { TOP_DOWN, ANGLED_25D, PERSPECTIVE_3D }
 
@@ -149,11 +151,11 @@ var _waypoint_arrow_color: Color = Color(0.8, 0.5, 1.0)
 func _ready() -> void:
 	# Detect web platform - shaders don't work reliably on web
 	_is_web = OS.has_feature("web")
-	print("[MINIMAP] _ready called, _is_web=%s, opacity=%s" % [_is_web, opacity])
+	if DEBUG_VERBOSE: print("[MINIMAP] _ready called, _is_web=%s, opacity=%s" % [_is_web, opacity])
 
 	# Disable shader on web - it causes opacity/rendering issues
 	if _is_web and viewport_container and viewport_container.material:
-		print("[MINIMAP] Nulling shader material for web")
+		if DEBUG_VERBOSE: print("[MINIMAP] Nulling shader material for web")
 		viewport_container.material = null
 
 	_update_size()
@@ -171,7 +173,7 @@ func _ready() -> void:
 	# Web fix: Defer opacity update to ensure it applies after everything is fully initialized
 	# NOTE: call_deferred("method_name") doesn't work on web - use timer instead
 	if _is_web:
-		print("[MINIMAP] Scheduling deferred _update_opacity for web via timer")
+		if DEBUG_VERBOSE: print("[MINIMAP] Scheduling deferred _update_opacity for web via timer")
 		get_tree().create_timer(0.0).timeout.connect(_update_opacity_web)
 
 func _process(_delta: float) -> void:
@@ -199,7 +201,7 @@ func _update_marker_visibility() -> void:
 	var should_log := _visibility_log_counter >= 60
 	if should_log:
 		_visibility_log_counter = 0
-		print("[MINIMAP] _update_marker_visibility: marker_view_distance=%s, tracked_markers=%d" % [marker_view_distance, _tracked_markers.size()])
+		if DEBUG_VERBOSE: print("[MINIMAP] _update_marker_visibility: marker_view_distance=%s, tracked_markers=%d" % [marker_view_distance, _tracked_markers.size()])
 
 	# Update static markers
 	for marker_id: int in _markers:
@@ -586,7 +588,7 @@ func get_marker_view_distance() -> float:
 
 func set_marker_view_distance(value: float) -> void:
 	marker_view_distance = value
-	print("[MINIMAP] set_marker_view_distance called with %s, actual=%s" % [value, marker_view_distance])
+	if DEBUG_VERBOSE: print("[MINIMAP] set_marker_view_distance called with %s, actual=%s" % [value, marker_view_distance])
 
 # ============ END GETTERS ============
 
@@ -678,7 +680,7 @@ func _create_edge_arrows_3d() -> void:
 		return
 
 	# Native: use separate edge_arrows_3d script
-	var edge_arrows_scene := preload("res://scenes/minimap/edge_arrows_3d.tscn")
+	var edge_arrows_scene := preload("res://scenes/minimap/edge-arrows-3d/edge-arrows-3d.tscn")
 	edge_arrows_3d = edge_arrows_scene.instantiate()
 	_world_root.add_child(edge_arrows_3d)
 	edge_arrows_3d.initialize(self, player)
@@ -872,16 +874,16 @@ func _update_position() -> void:
 
 func _update_opacity() -> void:
 	if not is_inside_tree():
-		print("[MINIMAP] _update_opacity: not in tree, skipping")
+		if DEBUG_VERBOSE: print("[MINIMAP] _update_opacity: not in tree, skipping")
 		return
 
-	print("[MINIMAP] _update_opacity: _is_web=%s, opacity=%s" % [_is_web, opacity])
+	if DEBUG_VERBOSE: print("[MINIMAP] _update_opacity: _is_web=%s, opacity=%s" % [_is_web, opacity])
 
 	if _is_web:
 		# Web: apply modulate to entire minimap (self) for consistent opacity
 		# This affects viewport_container, shadow, and all overlays uniformly
 		self.modulate.a = opacity
-		print("[MINIMAP] Web: set self.modulate.a = %s, actual=%s" % [opacity, self.modulate.a])
+		if DEBUG_VERBOSE: print("[MINIMAP] Web: set self.modulate.a = %s, actual=%s" % [opacity, self.modulate.a])
 	else:
 		# Native: use shader for viewport opacity (preserves rounded corners)
 		if viewport_container and viewport_container.material:

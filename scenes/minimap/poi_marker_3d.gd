@@ -330,8 +330,8 @@ func set_visibility_distance(distance: float) -> void:
 	visibility_distance = distance
 
 # Called by minimap to control visibility directly (web compatible)
-func set_visibility_from_minimap(is_visible: bool) -> void:
-	_is_visible_by_distance = is_visible
+func set_visibility_from_minimap(should_show: bool) -> void:
+	_is_visible_by_distance = should_show
 	# Don't hide the marker mesh - only the arrows should be affected by view distance
 	# The marker stays visible in the minimap view regardless
 

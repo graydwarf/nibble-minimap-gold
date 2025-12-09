@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://dkcgywp7qlgj6"]
 
-[ext_resource type="Script" path="res://scenes/minimap/edge_arrows_3d.gd" id="1_script"]
+[ext_resource type="Script" path="res://scenes/minimap/edge-arrows-3d/edge-arrows-3d.gd" id="1_script"]
 
 [node name="EdgeArrows3D" type="Node3D"]
 script = ExtResource("1_script")

@@ -25,7 +25,7 @@ A feature-rich mini-map component for Godot 4.x with waypoints, roaming markers,
 @onready var minimap: Control = $CanvasLayer/Minimap
 
 func _ready() -> void:
-    minimap.set_player($Player)
+	minimap.set_player($Player)
 ```
 
 ## Basic Configuration (Inspector)

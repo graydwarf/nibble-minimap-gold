@@ -10,8 +10,8 @@ var collectibles: Dictionary = {}  # collectible_node -> marker_id
 const SPAWN_RANGE := 40.0  # Stay within terrain chunk
 const NUM_COLLECTIBLES := 8  # Number of pellets to spawn
 
-const WandererScene = preload("res://scenes/entities/wanderer.tscn")
-const CollectibleScene = preload("res://scenes/entities/collectible.tscn")
+const WandererScene = preload("res://scenes/entities/wanderer/wanderer.tscn")
+const CollectibleScene = preload("res://scenes/entities/collectible/collectible.tscn")
 
 func _ready() -> void:
 	# Add player to group for collectible detection
@@ -44,7 +44,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 func _create_config_dialog() -> void:
-	var config_scene := load("res://scenes/minimap/minimap_config.tscn")
+	var config_scene := load("res://scenes/minimap/minimap-config/minimap-config.tscn")
 	config_dialog = config_scene.instantiate()
 	config_dialog.visible = false
 	$CanvasLayer.add_child(config_dialog)

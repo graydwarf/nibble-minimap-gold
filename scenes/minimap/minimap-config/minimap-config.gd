@@ -2,6 +2,8 @@ extends PanelContainer
 ## Configuration dialog for minimap runtime settings.
 ## Toggle with M key.
 
+const DEBUG_VERBOSE: bool = false
+
 signal closed
 
 var minimap: Control = null
@@ -112,14 +114,14 @@ func _on_view_changed(index: int) -> void:
 
 func _on_opacity_changed(value: float) -> void:
 	if minimap:
-		print("[CONFIG] Opacity changed to %s" % value)
+		if DEBUG_VERBOSE: print("[CONFIG] Opacity changed to %s" % value)
 		# Use public method to ensure web compatibility
 		if minimap.has_method("set_opacity"):
 			minimap.set_opacity(value)
 		else:
 			minimap.opacity = value
 		opacity_label.text = "%d%%" % int(value * 100)
-		print("[CONFIG] Minimap opacity now=%s, modulate.a=%s" % [minimap.opacity, minimap.modulate.a])
+		if DEBUG_VERBOSE: print("[CONFIG] Minimap opacity now=%s, modulate.a=%s" % [minimap.opacity, minimap.modulate.a])
 
 func _on_cardinals_toggled(pressed: bool) -> void:
 	if minimap:
@@ -137,7 +139,7 @@ func _on_resource_toggled(pressed: bool) -> void:
 
 func _on_distance_changed(value: float) -> void:
 	if minimap:
-		print("[CONFIG] View distance changed to %s" % value)
+		if DEBUG_VERBOSE: print("[CONFIG] View distance changed to %s" % value)
 		# Use setter method for web compatibility
 		if minimap.has_method("set_marker_view_distance"):
 			minimap.set_marker_view_distance(value)
@@ -161,7 +163,7 @@ func _on_distance_changed(value: float) -> void:
 		var actual_dist: float = 0.0
 		if minimap.has_method("get_marker_view_distance"):
 			actual_dist = minimap.get_marker_view_distance()
-		print("[CONFIG] Updated marker_view_distance=%s" % actual_dist)
+		if DEBUG_VERBOSE: print("[CONFIG] Updated marker_view_distance=%s" % actual_dist)
 
 func _on_close_pressed() -> void:
 	hide()
